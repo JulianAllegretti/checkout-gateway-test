@@ -123,12 +123,13 @@ PENDING → APPROVED | DECLINED | VOIDED | ERROR   (immutable final states)
   approved.** Two concurrent buyers on the last unit must not both reach the gateway:
   if stock is only checked/decremented at APPROVED time, both could get charged and
   only one gets the product.
-  - On create: atomic `UPDATE stock SET quantity = quantity - 1 WHERE product_id = $1
-    AND quantity > 0`. 0 rows affected → `OutOfStock`, the transaction is never
-    created and the gateway is never called.
+  - On create: atomic `UPDATE products SET stock = stock - :qty WHERE id = $1 AND
+    stock >= :qty` (`:qty` is the transaction's `quantity`, see
+    [DATA-MODEL.md](../DATA-MODEL.md)). 0 rows affected → `OutOfStock`, the
+    transaction is never created and the gateway is never called.
   - On `APPROVED`: no further stock change, it was already decremented at creation.
-  - On `DECLINED` / `ERROR` / `VOIDED`: restore the reservation, atomic `UPDATE stock
-    SET quantity = quantity + 1 WHERE product_id = $1`.
+  - On `DECLINED` / `ERROR` / `VOIDED`: restore the reservation, atomic `UPDATE
+    products SET stock = stock + :qty WHERE id = $1`.
 - Payment status: polling the gateway; a webhook (with an events key and signature
   validation) as a plus.
 

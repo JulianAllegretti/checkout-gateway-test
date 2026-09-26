@@ -16,9 +16,12 @@ reference.
   call so the checkout stays atomic and easy to reason about for double-submit safety.
 - The card PAN and CVC **never** reach the backend. The frontend tokenizes the card
   directly with the gateway's public key and only sends the resulting `cardToken`.
-- The backend never trusts client-sent amounts: `product`, `baseFee` and
-  `deliveryFee` in the response are always recomputed server-side from the DB /
-  config, never echoed back from the request.
+- The backend never trusts client-sent amounts: `unitPrice`, `subtotal`, `taxRate`,
+  `taxAmount`, `product`, `baseFee` and `deliveryFee` in the response are always
+  recomputed server-side from the DB / config, never echoed back from the request.
+  `quantity` is the one client-sent number that matters, and it's what gets reserved
+  from stock atomically (see ADR 0001) — everything money-related is derived from it
+  server-side.
 - All money amounts are integers in the currency's minor-less base unit (COP has no
   decimals), field `currency` is always `"COP"`.
 
@@ -72,7 +75,10 @@ summary on screen 3.
   "id": "b3f1c2a0-...-uuid",
   "name": "Wireless Headphones",
   "description": "Over-ear, active noise cancellation.",
-  "price": 350000,
+  "unitPrice": 350000,
+  "taxRate": 0.19,
+  "taxAmount": 66500,
+  "price": 416500,
   "stock": 12,
   "imageUrl": "https://.../headphones.jpg",
   "baseFee": 5000,
@@ -80,6 +86,11 @@ summary on screen 3.
   "currency": "COP"
 }
 ```
+
+`price` is the final, tax-included price (`unitPrice + taxAmount`) — what's shown as
+"product amount" on the summary screen. `taxRate` varies per product (some categories
+in Colombia have a reduced or zero IVA rate), so it's never assumed to be a fixed
+19% on the frontend.
 
 ## `POST /transactions`
 
@@ -93,10 +104,12 @@ client must poll `GET /transactions/:id`.
 {
   "idempotencyKey": "6c1f... (client-generated UUID, same value on retry)",
   "productId": "b3f1c2a0-...-uuid",
+  "quantity": 2,
   "cardToken": "tok_...",
   "paymentAcceptanceToken": "eyJhbGciOi...",
   "customer": {
-    "fullName": "Jane Doe",
+    "firstName": "Jane",
+    "lastName": "Doe",
     "email": "jane@example.com",
     "phone": "+573001234567"
   },
@@ -116,18 +129,30 @@ client must poll `GET /transactions/:id`.
   "transactionId": "8a2e...-uuid",
   "reference": "TRX-000123",
   "status": "APPROVED",
+  "card": {
+    "brand": "VISA",
+    "last4": "4242"
+  },
   "amount": {
-    "product": 350000,
+    "unitPrice": 350000,
+    "quantity": 2,
+    "subtotal": 700000,
+    "taxRate": 0.19,
+    "taxAmount": 133000,
+    "product": 833000,
     "baseFee": 5000,
     "deliveryFee": 8000,
-    "total": 363000,
+    "total": 846000,
     "currency": "COP"
   },
   "createdAt": "2026-09-25T14:03:00.000Z"
 }
 ```
 
-`status` is one of `PENDING | APPROVED | DECLINED | ERROR`.
+`status` is one of `PENDING | APPROVED | DECLINED | ERROR`. When `status` is
+`DECLINED` or `ERROR`, the response also includes a `reason` string (the gateway's
+decline reason, or a generic message for technical errors — never a raw
+exception/stack trace).
 
 **Idempotency**: retrying the same `idempotencyKey` (double click, network retry)
 returns the existing transaction instead of creating a new one / re-reserving stock.

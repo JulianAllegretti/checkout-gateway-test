@@ -14,8 +14,9 @@ gateway (sandbox mode only, no real money involved). See architecture decisions 
    expiration, CVC, cardholder name; VISA/MasterCard brand detection is a plus) plus
    customer delivery information. Card data is fake but must follow the real
    structure of a credit card.
-3. **Summary**: product amount + fixed base fee + delivery fee, shown in a backdrop
-   component, with a payment button.
+3. **Summary**: product amount (unit price + IVA — tax rate is per product, since
+   some products in Colombia have a reduced or zero IVA rate) + fixed base fee +
+   delivery fee, shown in a backdrop component, with a payment button.
 4. **Final status**: result of the transaction (approved / declined / error).
 5. **Back to product page** with stock already updated.
 
