@@ -65,6 +65,12 @@ gateway (sandbox mode only, no real money involved). See architecture decisions 
 - Product admin panel.
 - Kubernetes, Lambda, BFF (see ADR 0001 for the reasoning).
 
+## Stretch goals (only if time remains after the required rubric items)
+
+- Product listing/catalog page. The required flow only shows a single fixed product
+  (see business flow above); a listing is not required and shouldn't be started
+  before the core checkout flow, tests (>80% coverage) and deployment are done.
+
 ## Rubric (reference)
 
 | Item | Points |
