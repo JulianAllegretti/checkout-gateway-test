@@ -92,8 +92,10 @@ Rules to keep the option of splitting into separate repos later:
   (amount × 100), independent of `Money`'s peso-integer representation.
 - Redux persist only stores: checkout step, transaction ID, delivery data and
   product. Never the PAN or CVC.
-- Pino redacts token, email and address. Sentry uses `beforeSend` to filter sensitive
-  data.
+- Pino redacts token, email, phone and address. Sentry uses `beforeSend` to filter
+  the same fields. A global exception filter reports only genuinely unexpected
+  errors to Sentry — domain errors (already a well-formed HTTP response) aren't
+  bugs, so they're not reported.
 
 ## Backend: hexagonal + Railway Oriented Programming
 - Library: `neverthrow` (`Result`, `ResultAsync`, `andThen`, `match`).
