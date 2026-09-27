@@ -203,7 +203,13 @@ type CreateTransactionError =
 
 // ports/inbound/products.port.ts
 interface ProductsPort {
-  getCurrent(): ResultAsync<Product, ProductNotFound>;
+  getCurrent(): ResultAsync<Product, ProductNotFound | RepositoryError>;
+}
+
+// ports/outbound/product.repository.ts
+interface ProductRepository {
+  findFeatured(): ResultAsync<Product, ProductNotFound | RepositoryError>;
+  findById(id: string): ResultAsync<Product, ProductNotFound | RepositoryError>;
 }
 
 // ports/outbound/transaction.repository.ts
