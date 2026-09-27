@@ -14,8 +14,9 @@ gateway (sandbox mode only, no real money involved). See architecture decisions 
    expiration, CVC, cardholder name; VISA/MasterCard brand detection is a plus) plus
    customer delivery information. Card data is fake but must follow the real
    structure of a credit card.
-3. **Summary**: product amount + fixed base fee + delivery fee, shown in a backdrop
-   component, with a payment button.
+3. **Summary**: product amount (unit price + IVA — tax rate is per product, since
+   some products in Colombia have a reduced or zero IVA rate) + fixed base fee +
+   delivery fee, shown in a backdrop component, with a payment button.
 4. **Final status**: result of the transaction (approved / declined / error).
 5. **Back to product page** with stock already updated.
 
@@ -64,6 +65,12 @@ gateway (sandbox mode only, no real money involved). See architecture decisions 
 - User authentication / customer accounts.
 - Product admin panel.
 - Kubernetes, Lambda, BFF (see ADR 0001 for the reasoning).
+
+## Stretch goals (only if time remains after the required rubric items)
+
+- Product listing/catalog page. The required flow only shows a single fixed product
+  (see business flow above); a listing is not required and shouldn't be started
+  before the core checkout flow, tests (>80% coverage) and deployment are done.
 
 ## Rubric (reference)
 

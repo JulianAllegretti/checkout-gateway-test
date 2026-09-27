@@ -22,6 +22,7 @@ name in code, repo name or commits; use generic terms instead (`PaymentGateway`,
 | IaC | Terraform in `/infra` | The test explicitly lists IaC as evaluated. |
 | Observability | Sentry (front + back) + structured logs with pino and correlation ID | Grafana/OpenTelemetry left as a "if this had to scale" note. |
 | Specs | Spec-driven: general spec + per-app spec (including infra), with TDD and TASKS where relevant | PRD → ARD → TDD → Tasks → Tests → Implementation. |
+| Frontend styling | TailwindCSS (utility-first) | Fast to implement mobile-first responsive layouts, integrates natively with Vite/React with no extra runtime, and covers the rubric's CSS bonus without building a custom design system. |
 
 ## Architecture
 
@@ -115,9 +116,20 @@ PENDING → APPROVED | DECLINED | VOIDED | ERROR   (immutable final states)
 ```
 - `transitionTo(next): Result<Transaction, InvalidTransition>` on the entity.
 - Enforced at the DB level: `UPDATE ... SET status = $2 WHERE id = $1 AND status =
-  'PENDING'`. If it affects 0 rows, another process already updated it → don't touch
-  the stock (avoids double-decrementing between polling and a webhook).
-- Stock is only decremented if APPROVED, via an atomic update (`WHERE stock > 0`).
+  'PENDING'`. If it affects 0 rows, another process already updated it → don't repeat
+  the stock side-effect below (avoids double-processing the same transaction between
+  polling and a webhook).
+- **Stock is reserved when the transaction is created (PENDING), not when it's
+  approved.** Two concurrent buyers on the last unit must not both reach the gateway:
+  if stock is only checked/decremented at APPROVED time, both could get charged and
+  only one gets the product.
+  - On create: atomic `UPDATE products SET stock = stock - :qty WHERE id = $1 AND
+    stock >= :qty` (`:qty` is the transaction's `quantity`, see
+    [DATA-MODEL.md](../DATA-MODEL.md)). 0 rows affected → `OutOfStock`, the
+    transaction is never created and the gateway is never called.
+  - On `APPROVED`: no further stock change, it was already decremented at creation.
+  - On `DECLINED` / `ERROR` / `VOIDED`: restore the reservation, atomic `UPDATE
+    products SET stock = stock + :qty WHERE id = $1`.
 - Payment status: polling the gateway; a webhook (with an events key and signature
   validation) as a plus.
 
