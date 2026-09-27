@@ -14,8 +14,17 @@ module.exports = {
   },
   moduleNameMapper: {
     '\\.(css|less|scss)$': 'identity-obj-proxy',
+    // env.ts touches `import.meta.env`, which can't be parsed under the
+    // CommonJS module target these tests use — swap it for a plain mock.
+    '^\\./env$': '<rootDir>/src/lib/env.mock.ts',
   },
-  collectCoverageFrom: ['src/**/*.{ts,tsx}', '!src/main.tsx', '!src/**/*.spec.{ts,tsx}'],
+  collectCoverageFrom: [
+    'src/**/*.{ts,tsx}',
+    '!src/main.tsx',
+    '!src/lib/env.ts',
+    '!src/lib/env.mock.ts',
+    '!src/**/*.spec.{ts,tsx}',
+  ],
   coverageThreshold: {
     global: {
       branches: 80,
