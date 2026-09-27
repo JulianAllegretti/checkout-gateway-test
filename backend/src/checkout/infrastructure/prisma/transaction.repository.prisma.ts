@@ -84,7 +84,19 @@ export class TransactionRepositoryPrisma implements TransactionRepository {
       });
       if (reserved.count === 0) throw new OutOfStockSignal(data.productId, data.quantity);
 
-      const customer = await tx.customer.create({ data: data.customer });
+      // Find-or-create by email: `customers` is keyed by email (unique in the
+      // schema), not re-created per purchase. Contact details are updated to the
+      // latest submission on repeat purchases, since a stale name/phone from a
+      // previous order isn't preferable to what the customer just typed.
+      const customer = await tx.customer.upsert({
+        where: { email: data.customer.email },
+        create: data.customer,
+        update: {
+          firstName: data.customer.firstName,
+          lastName: data.customer.lastName,
+          phone: data.customer.phone,
+        },
+      });
 
       const transaction = await tx.transaction.create({
         data: {

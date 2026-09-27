@@ -125,6 +125,34 @@ describe('TransactionRepositoryPrisma (integration)', () => {
       expect(updatedProduct.stock).toBe(0);
       expect(await prisma.transaction.count()).toBe(1);
     });
+
+    it('reuses the existing customer by email instead of duplicating it, refreshing stale contact details', async () => {
+      const product = await createProduct(5);
+
+      const first = await repo.createPending(
+        buildData(product.id, {
+          customer: { firstName: 'Jane', lastName: 'Doe', email: 'jane@example.com', phone: '+571' },
+        }),
+      );
+      const second = await repo.createPending(
+        buildData(product.id, {
+          customer: { firstName: 'Jane R.', lastName: 'Roe', email: 'jane@example.com', phone: '+572' },
+        }),
+      );
+
+      expect(first.isOk()).toBe(true);
+      expect(second.isOk()).toBe(true);
+      expect(await prisma.customer.count()).toBe(1);
+
+      if (first.isOk() && second.isOk()) {
+        expect(second.value.toProps().customerId).toBe(first.value.toProps().customerId);
+      }
+
+      const customer = await prisma.customer.findUniqueOrThrow({ where: { email: 'jane@example.com' } });
+      expect(customer.firstName).toBe('Jane R.');
+      expect(customer.lastName).toBe('Roe');
+      expect(customer.phone).toBe('+572');
+    });
   });
 
   describe('updateResult', () => {

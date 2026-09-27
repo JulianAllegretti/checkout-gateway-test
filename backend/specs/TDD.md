@@ -123,7 +123,7 @@ model Customer {
   id           String        @id @default(uuid())
   firstName    String        @map("first_name")
   lastName     String        @map("last_name")
-  email        String
+  email        String        @unique
   phone        String
   transactions Transaction[]
 
@@ -219,9 +219,10 @@ interface PaymentGatewayPort {
 ## `TransactionsService.create` — ROP chain
 
 1. `findByIdempotencyKey` → if found, short-circuit and return it (idempotency).
-2. `createPending` → atomic `stock -= quantity WHERE stock >= quantity` + insert
-   `customers`, `deliveries`, `transactions` (PENDING) in one DB transaction. 0 rows
-   affected on the stock update → `OutOfStock`.
+2. `createPending` → atomic `stock -= quantity WHERE stock >= quantity` + find-or-create
+   `customers` by email (refreshing name/phone on a repeat buyer) + insert
+   `deliveries`, `transactions` (PENDING) in one DB transaction. 0 rows affected on the
+   stock update → `OutOfStock`.
 3. `PaymentGatewayPort.charge` with the tokenized card.
 4. On success: `updateResult` → `APPROVED`/`DECLINED`, write the `payments` row.
 5. On `DECLINED` or a thrown/technical failure (→ `ERROR`): `updateResult` +
