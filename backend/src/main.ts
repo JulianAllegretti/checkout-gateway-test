@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { RequestMethod, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { Logger } from 'nestjs-pino';
 import { AppModule } from './app.module';
@@ -28,6 +29,21 @@ async function bootstrap() {
       exceptionFactory: validationExceptionFactory,
     }),
   );
+
+  // Generated straight from the DTOs/controllers below, not hand-maintained —
+  // see API-CONTRACT.md for the narrative version. SwaggerModule.setup mounts
+  // directly on the HTTP adapter, bypassing setGlobalPrefix, so 'api/docs' is
+  // spelled out in full rather than relying on the prefix to apply here too.
+  const swaggerConfig = new DocumentBuilder()
+    .setTitle('Checkout API')
+    .setDescription(
+      'Checkout flow: create a transaction, charge a card via the payment gateway sandbox, and track its status.',
+    )
+    .setVersion('1.0')
+    .build();
+  const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig);
+  SwaggerModule.setup('api/docs', app, swaggerDocument);
+
   await app.listen(process.env.PORT ?? 3000);
 }
 bootstrap();
