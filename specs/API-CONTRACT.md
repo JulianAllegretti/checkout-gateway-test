@@ -38,14 +38,19 @@ reference.
 
 | `errorCode` | HTTP status | When |
 |---|---|---|
-| `VALIDATION_ERROR` | 400 | Malformed/invalid request body (bad card token format, missing fields, invalid email, etc.) |
+| `VALIDATION_ERROR` | 400 | Malformed/invalid request body (bad card token format, missing fields, invalid email, etc.) — `details` carries a `{ field: [messages] }` map |
 | `PRODUCT_NOT_FOUND` | 404 | `productId` doesn't match the current product |
 | `TRANSACTION_NOT_FOUND` | 404 | `GET /transactions/:id` with an unknown id |
 | `OUT_OF_STOCK` | 409 | Stock reservation failed at transaction creation (see ADR 0001) |
-| `TRANSACTION_ALREADY_RESOLVED` | 409 | Retrying/double-submitting a transaction that already left `PENDING` |
 | `INVALID_TRANSITION` | 409 | Internal state machine guard tripped (shouldn't reach the client in practice) |
 | `PAYMENT_DECLINED` | 422 | Gateway responded with a declined charge (business outcome, not a technical failure) |
-| `GATEWAY_ERROR` | 502 | Gateway timeout / 5xx / unreachable (technical failure) |
+| `GATEWAY_ERROR` | 502 | Gateway timeout / 5xx / unreachable (technical failure). `message` is always a fixed generic string — the real cause is never echoed to the client, only kept server-side |
+| `INTERNAL_ERROR` | 500 | Unexpected failure (e.g. a DB error) not covered by any of the above. `message` is always generic, same reasoning as `GATEWAY_ERROR` |
+
+Retrying the same `idempotencyKey` (double click, network retry) is **not** an
+error case — see `POST /transactions`'s Idempotency note below. It returns `201`
+with the transaction's current state, whatever that is (`PENDING` if the original
+attempt is still in flight, or its final resolved status otherwise).
 
 ## `GET /health`
 
