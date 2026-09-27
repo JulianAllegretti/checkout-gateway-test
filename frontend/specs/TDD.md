@@ -94,10 +94,17 @@ Redux later if we want them on the final status screen — they're not sensitive
 
 ## Error handling
 
-API error envelope (`errorCode`, `message`) maps to a small dictionary of
-user-facing copy per `errorCode` (`OUT_OF_STOCK`, `PAYMENT_DECLINED`,
-`GATEWAY_ERROR`, `VALIDATION_ERROR`, ...), rendered on the screen where it's
-relevant (stock/validation errors on screens 2–3, payment outcome on screen 4).
+Two different things can go wrong with `POST /transactions`, surfaced two different
+ways (see API-CONTRACT.md):
+- The request itself is rejected (`errorCode`/`message` error envelope: e.g.
+  `OUT_OF_STOCK`, `VALIDATION_ERROR`) — no transaction was created. A small
+  dictionary maps `errorCode` to user-facing copy, rendered on screen 3 where the
+  request was made.
+- The request succeeds (`201`) but the charge itself was declined or technically
+  failed — this is `status: 'DECLINED' | 'ERROR'` plus `reason` in the response
+  body, not an error at all from RTK Query's point of view. Screen 4 renders this
+  from `checkoutSlice.status`/`errorReason`, not from an error dictionary.
+
 Anything unexpected (network failure, 5xx we didn't model) falls back to a generic
 message + the `ErrorBoundary`/Sentry report.
 

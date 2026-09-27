@@ -110,9 +110,19 @@ Rules to keep the option of splitting into separate repos later:
   `ResultAsync.fromPromise`. Exceptions die at the boundary.
 - Distinguish a technical failure (timeout/5xx → `GatewayError` → transaction ERROR)
   from a business response (card declined → `PaymentDeclined` → transaction
-  DECLINED).
-- The controller only translates via an exhaustive `switch` to HTTP: NotFound→404,
-  OutOfStock→409, PaymentDeclined→422, GatewayError→502.
+  DECLINED) — both are caught at the `PaymentGatewayPort.charge` boundary and used
+  to resolve the transaction's `status`/`reason`.
+- `PaymentDeclined`/`GatewayError` never reach the HTTP layer as errors: once the
+  gateway call returns (success or failure), the transaction has been persisted
+  with a final status, and that's an `Ok` from the use case's point of view —
+  `POST /transactions` always responds `201`, whatever the outcome. Treating a
+  decline as an HTTP error was the original design here, but it meant the response
+  carried no `transactionId`, so a declined/failed charge couldn't be recovered via
+  `GET /transactions/:id` — found while building the frontend, fixed by making
+  `create()` return `Ok(transaction)` for every resolved outcome. The controller's
+  `switch` to HTTP only ever sees the errors that mean no transaction exists at
+  all: NotFound→404, OutOfStock→409, ValidationError→400, InvalidTransition→409,
+  RepositoryError→500.
 
 ## Transaction state machine
 ```

@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { err, errAsync, okAsync, ResultAsync, type Result } from 'neverthrow';
+import { errAsync, okAsync, ResultAsync, type Result } from 'neverthrow';
 import { Money } from '../domain/value-objects/money';
 import type { Product, Transaction, TransactionDetail } from '../domain/entities';
 import { ValidationError, type RepositoryError, type TransactionNotFound } from '../domain/errors';
@@ -130,11 +130,12 @@ export class TransactionsService implements TransactionsPort {
             }
           : { errorReason: chargeError.reason };
 
-      // Persist the resolution, but the use case still failed — re-surface the
-      // original charge error to the caller once the write is done (unless
-      // persisting it failed too, which is a worse problem than the charge itself).
-      const resolved = await this.resolve(pending, status, payment);
-      return resolved.isOk() ? err(chargeError) : err(resolved.error);
+      // A declined/error charge is still a successfully-resolved transaction
+      // from the domain's perspective — the outcome lives in the persisted
+      // status/reason, not in the Result's error channel (that's what lets
+      // GET /transactions/:id report it consistently). Only a failure to
+      // persist that resolution is a real error here.
+      return this.resolve(pending, status, payment);
     };
 
     return new ResultAsync(run());

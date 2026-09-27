@@ -21,12 +21,14 @@ export class TransactionsController {
     summary: 'Create the customer, delivery and a PENDING transaction (reserving stock atomically), then charge the card.',
     description: 'Retrying with the same idempotencyKey returns the existing transaction instead of creating a new one.',
   })
-  @ApiResponse({ status: 201, type: TransactionResponse })
+  @ApiResponse({
+    status: 201,
+    type: TransactionResponse,
+    description: 'Always 201, even when the charge itself was declined or failed — see the status/reason fields.',
+  })
   @ApiResponse({ status: 400, type: ErrorResponseDto, description: 'VALIDATION_ERROR' })
   @ApiResponse({ status: 404, type: ErrorResponseDto, description: 'PRODUCT_NOT_FOUND' })
   @ApiResponse({ status: 409, type: ErrorResponseDto, description: 'OUT_OF_STOCK or INVALID_TRANSITION' })
-  @ApiResponse({ status: 422, type: ErrorResponseDto, description: 'PAYMENT_DECLINED' })
-  @ApiResponse({ status: 502, type: ErrorResponseDto, description: 'GATEWAY_ERROR' })
   async create(@Body() dto: CreateTransactionDto): Promise<TransactionResponse> {
     // `cmd` here matches pino.config.ts's REDACT_PATHS shape — cardToken,
     // paymentAcceptanceToken, customer.email/phone and delivery.address never

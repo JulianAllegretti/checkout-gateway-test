@@ -197,9 +197,11 @@ interface TransactionsPort {
   create(cmd: CreateTransactionCommand): ResultAsync<Transaction, CreateTransactionError>;
   getById(id: string): ResultAsync<TransactionDetail, TransactionNotFound | RepositoryError>;
 }
-type CreateTransactionError =
-  | ValidationError | ProductNotFound | OutOfStock | PaymentDeclined | GatewayError
-  | InvalidTransition | RepositoryError;
+// PaymentDeclined/GatewayError are NOT part of this union — a declined or failed
+// charge is still a successfully created and resolved transaction (an `Ok`), the
+// outcome is reported via status/reason. Only a failure to create/resolve the
+// transaction at all is a real error here.
+type CreateTransactionError = ValidationError | ProductNotFound | OutOfStock | InvalidTransition | RepositoryError;
 
 // ports/inbound/products.port.ts
 interface ProductsPort {
@@ -237,10 +239,13 @@ interface PaymentGatewayPort {
    ownership of that email) + insert `deliveries`, `transactions` (PENDING) in one DB
    transaction. 0 rows affected on the stock update → `OutOfStock`.
 3. `PaymentGatewayPort.charge` with the tokenized card.
-4. On success: `updateResult` → `APPROVED`/`DECLINED`, write the `payments` row.
-5. On `DECLINED` or a thrown/technical failure (→ `ERROR`): `updateResult` +
-   restore stock (`stock += quantity`) in the same DB transaction as the status
-   update, so a crash between them can't leave stock wrong.
+4. On a successful charge: `updateResult` → `APPROVED`, write the `payments` row.
+5. On a declined charge or a thrown/technical failure (→ `DECLINED`/`ERROR`):
+   `updateResult` + restore stock (`stock += quantity`) in the same DB transaction
+   as the status update, so a crash between them can't leave stock wrong. Either
+   way `create()` still returns `Ok(transaction)` — the outcome lives in `status`/
+   `reason`, not in the `Result`'s error channel (only a failure to persist that
+   resolution is a real `create()` error).
 
 Each arrow is a `.andThen`; the whole chain is one `ResultAsync`, matching ADR 0001.
 
@@ -300,7 +305,8 @@ exported in the shell — harmless in the actual container, where Docker Compose
   through. Anything else is an actual bug that escaped the `Result`/ROP chain;
   that's the only case reported to `Sentry.captureException`, and the client
   still only ever sees a generic 500 (`INTERNAL_ERROR`), never the real
-  exception — same "no raw exception to the client" rule as `GATEWAY_ERROR`.
+  exception — same "no raw exception to the client" rule applied when a
+  gateway failure resolves a transaction to `ERROR`.
 
 ## A build gotcha worth knowing
 

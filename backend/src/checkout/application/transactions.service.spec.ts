@@ -206,7 +206,7 @@ describe('TransactionsService.create', () => {
     );
   });
 
-  it('on a declined charge: persists DECLINED with the decline reason, but still errs with PaymentDeclined', async () => {
+  it('on a declined charge: persists and returns DECLINED with the decline reason (not a create() error)', async () => {
     const updateResult = jest.fn((_id: string, resolution: Parameters<TransactionRepository['updateResult']>[1]) =>
       okAsync(new Transaction({ ...pendingTransaction().toProps(), status: resolution.status })),
     );
@@ -219,11 +219,8 @@ describe('TransactionsService.create', () => {
 
     const result = await service.create(buildCommand());
 
-    expect(result.isErr()).toBe(true);
-    if (result.isErr()) {
-      expect(result.error.type).toBe('PAYMENT_DECLINED');
-      if (result.error.type === 'PAYMENT_DECLINED') expect(result.error.reason).toBe('insufficient_funds');
-    }
+    expect(result.isOk()).toBe(true);
+    if (result.isOk()) expect(result.value.status).toBe('DECLINED');
     expect(updateResult).toHaveBeenCalledWith(
       'trx-1',
       expect.objectContaining({
@@ -233,7 +230,7 @@ describe('TransactionsService.create', () => {
     );
   });
 
-  it('on a gateway error: persists ERROR with the error reason, but still errs with GatewayError', async () => {
+  it('on a gateway error: persists and returns ERROR with the error reason (not a create() error)', async () => {
     const updateResult = jest.fn((_id: string, resolution: Parameters<TransactionRepository['updateResult']>[1]) =>
       okAsync(new Transaction({ ...pendingTransaction().toProps(), status: resolution.status })),
     );
@@ -244,15 +241,15 @@ describe('TransactionsService.create', () => {
 
     const result = await service.create(buildCommand());
 
-    expect(result.isErr()).toBe(true);
-    if (result.isErr()) expect(result.error.type).toBe('GATEWAY_ERROR');
+    expect(result.isOk()).toBe(true);
+    if (result.isOk()) expect(result.value.status).toBe('ERROR');
     expect(updateResult).toHaveBeenCalledWith(
       'trx-1',
       expect.objectContaining({ status: 'ERROR', payment: { errorReason: 'timeout' } }),
     );
   });
 
-  it('surfaces a RepositoryError instead of the original decline when persisting the resolution itself fails', async () => {
+  it('surfaces a RepositoryError when persisting a declined/error resolution itself fails', async () => {
     const service = buildService({
       transactions: fakeTransactionRepository({
         updateResult: () => errAsync(new RepositoryError('connection lost')),
