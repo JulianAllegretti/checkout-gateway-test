@@ -243,6 +243,33 @@ Each arrow is a `.andThen`; the whole chain is one `ResultAsync`, matching ADR 0
 `DATABASE_URL`, `PAYMENT_API_URL`, `PAYMENT_PRIVATE_KEY`,
 `PAYMENT_INTEGRITY_SECRET`, `BASE_FEE_AMOUNT`, `DELIVERY_FEE_AMOUNT`, `PORT`,
 `SENTRY_DSN`, `LOG_LEVEL`. All in `.env.example` with placeholder values only.
+`main.ts` loads `.env` itself (`import 'dotenv/config'`) so `npm run start:dev`
+works standalone against the Dockerized Postgres, without needing the vars
+exported in the shell — harmless in the actual container, where Docker Compose's
+`env_file` already sets real env vars and dotenv never overrides an existing one.
+
+## Bootstrap (`main.ts`)
+
+- Global prefix `/api`, except `GET /health` (stays unauthenticated and reachable
+  directly, per ADR 0001 / API-CONTRACT.md).
+- Global `ValidationPipe` (`whitelist`, `forbidNonWhitelisted`, `transform`) with a
+  custom `exceptionFactory` — otherwise a DTO validation failure returns Nest's
+  own default shape (`{message, error, statusCode}`), not the project's error
+  envelope. It flattens nested (`@ValidateNested`) errors into a dotted-path
+  `details` map, e.g. `"customer.email": ["email must be an email"]`.
+- `CheckoutModule` wires every port to its adapter (`useClass`, keyed by the
+  ports' Symbol tokens) — see `checkout.module.ts`. `HttpModule` (from
+  `@nestjs/axios`) is imported there for `HttpPaymentGatewayAdapter`.
+
+## A build gotcha worth knowing
+
+`tsconfig.build.json` inherits `incremental: true` from the base config. Its
+default `.tsbuildinfo` location is the project root, **outside** `dist/` — so
+`nest-cli.json`'s `deleteOutDir` wipes `dist/` on every build but never touches
+that cache file. TypeScript then trusts the stale cache and believes a wiped
+build is already up to date, silently emitting nothing (`nest build` exits 0,
+no errors, no `dist/`). Fixed by pointing `tsBuildInfoFile` inside `dist/`
+(`tsconfig.build.json`), so it gets deleted right along with everything else.
 
 ## Testing strategy
 
