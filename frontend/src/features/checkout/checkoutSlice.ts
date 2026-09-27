@@ -1,10 +1,6 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit'
-import type {
-  CustomerDraft,
-  DeliveryDraft,
-  Product,
-  TransactionStatus,
-} from './types'
+import type { CustomerDraft, DeliveryDraft } from './schemas'
+import type { Product, TransactionStatus } from './types'
 
 export interface CheckoutState {
   step: 1 | 2 | 3 | 4 | 5

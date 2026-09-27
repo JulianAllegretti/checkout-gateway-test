@@ -5,7 +5,8 @@ import checkoutReducer, {
   transactionCreated,
   transactionStatusUpdated,
 } from './checkoutSlice'
-import type { CustomerDraft, DeliveryDraft, Product } from './types'
+import type { CustomerDraft, DeliveryDraft } from './schemas'
+import type { Product } from './types'
 
 const product: Product = {
   id: 'b3f1c2a0-uuid',
