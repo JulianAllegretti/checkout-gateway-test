@@ -66,7 +66,7 @@ export interface TransactionRepository {
   findByIdempotencyKey(key: string): ResultAsync<Transaction | null, RepositoryError>;
   createPending(data: NewTransactionData): ResultAsync<Transaction, OutOfStock | ProductNotFound | RepositoryError>;
   updateResult(id: string, resolution: TransactionResolution): ResultAsync<Transaction, RepositoryError>;
-  findById(id: string): ResultAsync<Transaction, TransactionNotFound>;
+  findById(id: string): ResultAsync<Transaction, TransactionNotFound | RepositoryError>;
   /** Single-query read (customer + delivery + payment joined) for `GET /transactions/:id`. */
-  findByIdWithDetails(id: string): ResultAsync<TransactionDetail, TransactionNotFound>;
+  findByIdWithDetails(id: string): ResultAsync<TransactionDetail, TransactionNotFound | RepositoryError>;
 }

@@ -2,9 +2,11 @@ import type { ResultAsync } from 'neverthrow';
 import type { Transaction, TransactionDetail } from '../../domain/entities';
 import type {
   GatewayError,
+  InvalidTransition,
   OutOfStock,
   PaymentDeclined,
   ProductNotFound,
+  RepositoryError,
   TransactionNotFound,
   ValidationError,
 } from '../../domain/errors';
@@ -41,9 +43,11 @@ export type CreateTransactionError =
   | ProductNotFound
   | OutOfStock
   | PaymentDeclined
-  | GatewayError;
+  | GatewayError
+  | InvalidTransition
+  | RepositoryError;
 
 export interface TransactionsPort {
   create(cmd: CreateTransactionCommand): ResultAsync<Transaction, CreateTransactionError>;
-  getById(id: string): ResultAsync<TransactionDetail, TransactionNotFound>;
+  getById(id: string): ResultAsync<TransactionDetail, TransactionNotFound | RepositoryError>;
 }

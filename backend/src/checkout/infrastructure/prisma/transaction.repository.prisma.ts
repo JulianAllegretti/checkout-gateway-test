@@ -41,20 +41,20 @@ export class TransactionRepositoryPrisma implements TransactionRepository {
     ).map((row) => (row ? toDomain(row) : null));
   }
 
-  findById(id: string): ResultAsync<Transaction, TransactionNotFound> {
+  findById(id: string): ResultAsync<Transaction, TransactionNotFound | RepositoryError> {
     return ResultAsync.fromPromise(
       this.prisma.transaction.findUnique({ where: { id } }),
-      () => new TransactionNotFound(id),
+      toRepositoryError,
     ).andThen((row) => (row ? okAsync(toDomain(row)) : errAsync(new TransactionNotFound(id))));
   }
 
-  findByIdWithDetails(id: string): ResultAsync<TransactionDetail, TransactionNotFound> {
+  findByIdWithDetails(id: string): ResultAsync<TransactionDetail, TransactionNotFound | RepositoryError> {
     return ResultAsync.fromPromise(
       this.prisma.transaction.findUnique({
         where: { id },
         include: { customer: true, delivery: true, payment: true },
       }),
-      () => new TransactionNotFound(id),
+      toRepositoryError,
     ).andThen((row) => {
       if (!row) return errAsync(new TransactionNotFound(id));
       return okAsync({
