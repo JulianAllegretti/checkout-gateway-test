@@ -1,15 +1,9 @@
 import { HttpException, HttpStatus } from '@nestjs/common';
-import type { CreateTransactionError } from '../../ports/inbound/transactions.port';
 import type { TransactionNotFound } from '../../domain/errors';
+import type { CreateTransactionError } from '../../ports/inbound/transactions.port';
+import { ErrorResponseDto } from './dto/error-response.dto';
 
 export type HttpMappableError = CreateTransactionError | TransactionNotFound;
-
-interface ErrorBody {
-  readonly statusCode: number;
-  readonly errorCode: string;
-  readonly message: string;
-  readonly details: unknown;
-}
 
 /**
  * The one exhaustive switch from a domain error to the HTTP error envelope (see
@@ -21,7 +15,7 @@ export function toHttpException(error: HttpMappableError): HttpException {
   return new HttpException(body, body.statusCode);
 }
 
-function toErrorBody(error: HttpMappableError): ErrorBody {
+function toErrorBody(error: HttpMappableError): ErrorResponseDto {
   switch (error.type) {
     case 'VALIDATION_ERROR':
       return build(HttpStatus.BAD_REQUEST, error.type, error.message, error.details ?? null);
@@ -43,6 +37,6 @@ function toErrorBody(error: HttpMappableError): ErrorBody {
   }
 }
 
-function build(statusCode: number, errorCode: string, message: string, details: unknown = null): ErrorBody {
+function build(statusCode: number, errorCode: string, message: string, details: unknown = null): ErrorResponseDto {
   return { statusCode, errorCode, message, details };
 }
