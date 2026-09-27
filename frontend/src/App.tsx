@@ -2,6 +2,7 @@ import { Provider, useSelector } from 'react-redux'
 import { PersistGate } from 'redux-persist/integration/react'
 import type { RootState } from './app/store'
 import { persistor, store } from './app/store'
+import { PaymentModal } from './components/checkout/PaymentModal'
 import { ProductPage } from './pages/ProductPage'
 
 // Single route: screens are conditionally rendered from checkoutSlice.step,
@@ -13,8 +14,13 @@ export function Screens() {
   switch (step) {
     case 1:
       return <ProductPage />
+    case 2:
+      // The card token/acceptance token PaymentModal produces are handed
+      // here, not to Redux — screen 3 (task 7) will start holding and
+      // consuming them; for now there's nothing downstream to pass them to.
+      return <PaymentModal onSubmitted={() => {}} />
     default:
-      // Screens 2-5 land in later tasks — see frontend/specs/TASKS.md.
+      // Screens 3-5 land in later tasks — see frontend/specs/TASKS.md.
       return null
   }
 }
