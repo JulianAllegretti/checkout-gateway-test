@@ -3,7 +3,6 @@
   "compilerOptions": {
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.test.tsbuildinfo",
     "module": "commonjs",
-    "moduleResolution": "node",
     "verbatimModuleSyntax": false,
     "erasableSyntaxOnly": false,
     "noUnusedLocals": false,
@@ -11,5 +10,6 @@
     "noEmit": false,
     "types": ["jest", "node", "@testing-library/jest-dom"]
   },
-  "include": ["src"]
+  "include": ["src"],
+  "exclude": ["src/main.tsx"]
 }
