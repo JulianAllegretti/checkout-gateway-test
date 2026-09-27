@@ -8,6 +8,7 @@ import {
   type PaymentSecrets,
 } from './components/checkout/PaymentModal'
 import { SummaryBackdrop } from './components/checkout/SummaryBackdrop'
+import { FinalStatusPage } from './pages/FinalStatusPage'
 import { ProductPage } from './pages/ProductPage'
 
 // Single route: screens are conditionally rendered from checkoutSlice.step,
@@ -37,8 +38,10 @@ export function Screens() {
       ) : (
         <PaymentModal onSubmitted={setPaymentSecrets} />
       )
+    case 4:
+      return <FinalStatusPage />
     default:
-      // Screens 4-5 land in later tasks — see frontend/specs/TASKS.md.
+      // Screen 5 lands in a later task — see frontend/specs/TASKS.md.
       return null
   }
 }

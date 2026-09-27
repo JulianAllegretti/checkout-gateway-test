@@ -6,6 +6,7 @@ import App, { Screens } from './App'
 import { api } from './features/checkout/api'
 import checkoutReducer, {
   productSelected,
+  transactionCreated,
 } from './features/checkout/checkoutSlice'
 import type { Product } from './features/checkout/types'
 import { getAcceptanceToken, tokenizeCard } from './lib/gatewayClient'
@@ -130,6 +131,29 @@ describe('App', () => {
     expect(screen.getByRole('button', { name: 'Continue' })).toBeInTheDocument()
   })
 
+  it('renders the final status page for step 4', () => {
+    const store = configureStore({
+      reducer: { checkout: checkoutReducer, [api.reducerPath]: api.reducer },
+      middleware: (getDefaultMiddleware) =>
+        getDefaultMiddleware().concat(api.middleware),
+    })
+    store.dispatch(
+      transactionCreated({
+        transactionId: 'tx-1',
+        reference: 'ref-1',
+        status: 'APPROVED',
+      }),
+    )
+
+    render(
+      <Provider store={store}>
+        <Screens />
+      </Provider>,
+    )
+
+    expect(screen.getByText('Payment approved')).toBeInTheDocument()
+  })
+
   it('renders nothing yet for a step without a screen built', () => {
     const store = configureStore({
       reducer: { checkout: checkoutReducer, [api.reducerPath]: api.reducer },
@@ -138,7 +162,7 @@ describe('App', () => {
       preloadedState: {
         checkout: {
           ...checkoutReducer(undefined, { type: '@@INIT' }),
-          step: 4 as const,
+          step: 5 as const,
         },
       },
     })
