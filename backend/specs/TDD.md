@@ -195,10 +195,11 @@ and coupled to code, not data-driven.
 // ports/inbound/transactions.port.ts
 interface TransactionsPort {
   create(cmd: CreateTransactionCommand): ResultAsync<Transaction, CreateTransactionError>;
-  getById(id: string): ResultAsync<TransactionDetail, TransactionNotFound>;
+  getById(id: string): ResultAsync<TransactionDetail, TransactionNotFound | RepositoryError>;
 }
 type CreateTransactionError =
-  | ProductNotFound | OutOfStock | PaymentDeclined | GatewayError | ValidationError;
+  | ValidationError | ProductNotFound | OutOfStock | PaymentDeclined | GatewayError
+  | InvalidTransition | RepositoryError;
 
 // ports/inbound/products.port.ts
 interface ProductsPort {
@@ -210,10 +211,10 @@ interface TransactionRepository {
   findByIdempotencyKey(key: string): ResultAsync<Transaction | null, RepositoryError>;
   createPending(data: NewTransaction): ResultAsync<Transaction, OutOfStock | RepositoryError>;
   updateResult(id: string, result: TransactionResult): ResultAsync<Transaction, InvalidTransition | RepositoryError>;
-  findById(id: string): ResultAsync<Transaction, TransactionNotFound>;
+  findById(id: string): ResultAsync<Transaction, TransactionNotFound | RepositoryError>;
   // Joins customer + delivery + payment in one Prisma `include` read — see ARD.md
   // for why those three don't get their own repository.
-  findByIdWithDetails(id: string): ResultAsync<TransactionDetail, TransactionNotFound>;
+  findByIdWithDetails(id: string): ResultAsync<TransactionDetail, TransactionNotFound | RepositoryError>;
 }
 
 // ports/outbound/payment-gateway.port.ts
