@@ -1,10 +1,8 @@
 import type { ResultAsync } from 'neverthrow';
 import type { Transaction, TransactionDetail } from '../../domain/entities';
 import type {
-  GatewayError,
   InvalidTransition,
   OutOfStock,
-  PaymentDeclined,
   ProductNotFound,
   RepositoryError,
   TransactionNotFound,
@@ -38,14 +36,10 @@ export interface CreateTransactionCommand {
   readonly delivery: CreateTransactionDelivery;
 }
 
-export type CreateTransactionError =
-  | ValidationError
-  | ProductNotFound
-  | OutOfStock
-  | PaymentDeclined
-  | GatewayError
-  | InvalidTransition
-  | RepositoryError;
+// A declined/error charge is NOT part of this union — it's a successfully
+// created and resolved transaction (see transactions.service.ts), reported
+// via status/reason, not as a create() failure.
+export type CreateTransactionError = ValidationError | ProductNotFound | OutOfStock | InvalidTransition | RepositoryError;
 
 export interface TransactionsPort {
   create(cmd: CreateTransactionCommand): ResultAsync<Transaction, CreateTransactionError>;

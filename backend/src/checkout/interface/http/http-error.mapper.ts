@@ -25,13 +25,6 @@ function toErrorBody(error: HttpMappableError): ErrorResponseDto {
     case 'OUT_OF_STOCK':
     case 'INVALID_TRANSITION':
       return build(HttpStatus.CONFLICT, error.type, error.message);
-    case 'PAYMENT_DECLINED':
-      return build(HttpStatus.UNPROCESSABLE_ENTITY, error.type, error.message);
-    case 'GATEWAY_ERROR':
-      // error.message wraps the raw axios/network failure (hostnames, timeouts,
-      // upstream status text) — technical detail that never belongs in a client
-      // response (API-CONTRACT.md: "never a raw exception/stack trace").
-      return build(HttpStatus.BAD_GATEWAY, error.type, 'The payment gateway is currently unavailable');
     case 'REPOSITORY_ERROR':
       return build(HttpStatus.INTERNAL_SERVER_ERROR, 'INTERNAL_ERROR', 'An internal error occurred');
   }

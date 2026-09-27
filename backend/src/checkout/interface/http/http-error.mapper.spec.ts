@@ -1,9 +1,7 @@
 import { HttpStatus } from '@nestjs/common';
 import {
-  GatewayError,
   InvalidTransition,
   OutOfStock,
-  PaymentDeclined,
   ProductNotFound,
   RepositoryError,
   TransactionNotFound,
@@ -50,20 +48,6 @@ describe('toHttpException', () => {
     const exception = toHttpException(new InvalidTransition('APPROVED', 'DECLINED'));
     expect(exception.getStatus()).toBe(HttpStatus.CONFLICT);
     expect((exception.getResponse() as { errorCode: string }).errorCode).toBe('INVALID_TRANSITION');
-  });
-
-  it('maps PaymentDeclined to 422', () => {
-    const exception = toHttpException(new PaymentDeclined('insufficient_funds'));
-    expect(exception.getStatus()).toBe(HttpStatus.UNPROCESSABLE_ENTITY);
-    expect((exception.getResponse() as { errorCode: string }).errorCode).toBe('PAYMENT_DECLINED');
-  });
-
-  it('maps GatewayError to 502 with a generic message, without leaking the raw technical reason', () => {
-    const exception = toHttpException(new GatewayError('getaddrinfo ENOTFOUND internal-gateway-host.example'));
-    expect(exception.getStatus()).toBe(HttpStatus.BAD_GATEWAY);
-    const body = exception.getResponse() as { errorCode: string; message: string };
-    expect(body.errorCode).toBe('GATEWAY_ERROR');
-    expect(body.message).not.toContain('ENOTFOUND');
   });
 
   it('maps RepositoryError to a generic 500, without leaking the internal reason', () => {

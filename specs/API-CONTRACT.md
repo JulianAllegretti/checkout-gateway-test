@@ -43,9 +43,11 @@ reference.
 | `TRANSACTION_NOT_FOUND` | 404 | `GET /transactions/:id` with an unknown id |
 | `OUT_OF_STOCK` | 409 | Stock reservation failed at transaction creation (see ADR 0001) |
 | `INVALID_TRANSITION` | 409 | Internal state machine guard tripped (shouldn't reach the client in practice) |
-| `PAYMENT_DECLINED` | 422 | Gateway responded with a declined charge (business outcome, not a technical failure) |
-| `GATEWAY_ERROR` | 502 | Gateway timeout / 5xx / unreachable (technical failure). `message` is always a fixed generic string — the real cause is never echoed to the client, only kept server-side |
-| `INTERNAL_ERROR` | 500 | Unexpected failure (e.g. a DB error) not covered by any of the above. `message` is always generic, same reasoning as `GATEWAY_ERROR` |
+| `INTERNAL_ERROR` | 500 | Unexpected failure (e.g. a DB error) not covered by any of the above. `message` is always generic |
+
+A declined charge or a technical failure to charge the card is **not** one of these
+error codes — `POST /transactions` still responds `201` in both cases, with
+`status: "DECLINED"` or `status: "ERROR"` and a `reason`. See below.
 
 Retrying the same `idempotencyKey` (double click, network retry) is **not** an
 error case — see `POST /transactions`'s Idempotency note below. It returns `201`
@@ -157,7 +159,11 @@ client must poll `GET /transactions/:id`.
 `status` is one of `PENDING | APPROVED | DECLINED | ERROR`. When `status` is
 `DECLINED` or `ERROR`, the response also includes a `reason` string (the gateway's
 decline reason, or a generic message for technical errors — never a raw
-exception/stack trace).
+exception/stack trace). A declined or failed charge is a normal `201`, not an error
+response — the transaction was still created and resolved, just with an unhappy
+outcome. The only error responses this endpoint can return are the ones in the
+[error envelope](#error-envelope) table above (validation, out-of-stock, ...), which
+mean no transaction was created at all.
 
 **Idempotency**: retrying the same `idempotencyKey` (double click, network retry)
 returns the existing transaction instead of creating a new one / re-reserving stock.

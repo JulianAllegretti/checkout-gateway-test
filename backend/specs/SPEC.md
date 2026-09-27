@@ -34,8 +34,8 @@ backend-specific and adds validation detail the shared specs don't cover.
 | Invalid `customer.email` / missing required fields | `VALIDATION_ERROR` (400) |
 | Double submit (same `idempotencyKey` retried) | Returns the existing transaction, no new reservation |
 | Already-resolved transaction re-submitted with a new key but same intent | Out of scope to detect (no accounts to correlate "same intent"); idempotency key is the only guard, as documented in API-CONTRACT.md |
-| Gateway unreachable / timeout / 5xx | `GATEWAY_ERROR` (502), transaction → `ERROR`, stock restored |
-| Gateway responds "declined" | `PAYMENT_DECLINED` (422), transaction → `DECLINED`, stock restored |
+| Gateway unreachable / timeout / 5xx | `201`, transaction → `ERROR` with a generic reason, stock restored |
+| Gateway responds "declined" | `201`, transaction → `DECLINED` with the gateway's reason, stock restored |
 | `GET /transactions/:id` with unknown id | `TRANSACTION_NOT_FOUND` (404) |
 
 ## Non-functional
