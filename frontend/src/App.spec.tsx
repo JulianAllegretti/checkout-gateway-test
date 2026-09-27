@@ -40,13 +40,28 @@ describe('App', () => {
     expect(await screen.findByText(product.name)).toBeInTheDocument()
   })
 
+  it('renders the payment modal for step 2', () => {
+    const store = configureStore({
+      reducer: { checkout: checkoutReducer, [api.reducerPath]: api.reducer },
+      middleware: (getDefaultMiddleware) => getDefaultMiddleware().concat(api.middleware),
+    })
+    store.dispatch(productSelected(product)) // step -> 2
+
+    render(
+      <Provider store={store}>
+        <Screens />
+      </Provider>,
+    )
+
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeInTheDocument()
+  })
+
   it('renders nothing yet for a step without a screen built', () => {
     const store = configureStore({
       reducer: { checkout: checkoutReducer, [api.reducerPath]: api.reducer },
-      middleware: (getDefaultMiddleware) =>
-        getDefaultMiddleware().concat(api.middleware),
+      middleware: (getDefaultMiddleware) => getDefaultMiddleware().concat(api.middleware),
+      preloadedState: { checkout: { ...checkoutReducer(undefined, { type: '@@INIT' }), step: 4 as const } },
     })
-    store.dispatch(productSelected(product)) // step -> 2
 
     const { container } = render(
       <Provider store={store}>
