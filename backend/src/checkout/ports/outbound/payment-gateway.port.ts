@@ -7,6 +7,7 @@ export interface ChargeRequest {
   readonly reference: string;
   readonly cardToken: string;
   readonly paymentAcceptanceToken: string;
+  readonly customerEmail: string;
   readonly amount: number;
   readonly currency: string;
 }

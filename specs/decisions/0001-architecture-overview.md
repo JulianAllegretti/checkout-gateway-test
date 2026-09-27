@@ -86,8 +86,10 @@ Rules to keep the option of splitting into separate repos later:
 - The frontend tokenizes the card directly with the gateway using the public key.
   The card number and CVC never reach the backend; the backend only receives the
   token.
-- The integrity signature (hash of reference + amount + currency + integrity secret)
-  is generated on the backend.
+- The integrity signature is generated on the backend, in the gateway adapter, right
+  before charging: `SHA256(reference + amountInCents + currency + integritySecret)`,
+  concatenated with no separator. `amountInCents` is the gateway's own convention
+  (amount × 100), independent of `Money`'s peso-integer representation.
 - Redux persist only stores: checkout step, transaction ID, delivery data and
   product. Never the PAN or CVC.
 - Pino redacts token, email and address. Sentry uses `beforeSend` to filter sensitive
