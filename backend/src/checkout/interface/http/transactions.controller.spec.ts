@@ -1,11 +1,20 @@
 import { HttpException, HttpStatus } from '@nestjs/common';
 import { errAsync, okAsync } from 'neverthrow';
+import type { PinoLogger } from 'nestjs-pino';
 import { Transaction } from '../../domain/entities';
 import type { TransactionDetail, TransactionStatus } from '../../domain/entities';
 import { OutOfStock, RepositoryError, TransactionNotFound } from '../../domain/errors';
 import type { TransactionsPort } from '../../ports/inbound/transactions.port';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
 import { TransactionsController } from './transactions.controller';
+
+function fakeLogger(): PinoLogger {
+  return { debug: jest.fn() } as unknown as PinoLogger;
+}
+
+function buildController(port: TransactionsPort, logger: PinoLogger = fakeLogger()): TransactionsController {
+  return new TransactionsController(port, logger);
+}
 
 function buildTransaction(status: TransactionStatus): Transaction {
   return new Transaction({
@@ -71,9 +80,14 @@ async function expectHttpException(promise: Promise<unknown>): Promise<HttpExcep
 
 describe('TransactionsController.create', () => {
   it('creates, then fetches details, and returns the response without customer/delivery', async () => {
-    const controller = new TransactionsController(fakePort());
+    const logger = fakeLogger();
+    const controller = buildController(fakePort(), logger);
 
     const result = await controller.create(buildDto());
+
+    // The debug payload is logged under `cmd`, matching pino.config.ts's
+    // REDACT_PATHS shape (cmd.cardToken, cmd.customer.email, ...).
+    expect(logger.debug).toHaveBeenCalledWith({ cmd: expect.any(CreateTransactionDto) }, 'Received create-transaction request');
 
     expect(result).toEqual({
       transactionId: 'trx-1',
@@ -99,7 +113,7 @@ describe('TransactionsController.create', () => {
   });
 
   it('includes reason when the resolved transaction is DECLINED', async () => {
-    const controller = new TransactionsController(
+    const controller = buildController(
       fakePort({
         create: () => okAsync(buildTransaction('DECLINED')),
         getById: () =>
@@ -123,7 +137,7 @@ describe('TransactionsController.create', () => {
   });
 
   it('replaces a raw technical error reason with a generic message on ERROR (never leaks internals)', async () => {
-    const controller = new TransactionsController(
+    const controller = buildController(
       fakePort({
         create: () => okAsync(buildTransaction('ERROR')),
         getById: () =>
@@ -148,7 +162,7 @@ describe('TransactionsController.create', () => {
   });
 
   it('omits reason for a DECLINED transaction with no declineReason on record', async () => {
-    const controller = new TransactionsController(
+    const controller = buildController(
       fakePort({
         create: () => okAsync(buildTransaction('DECLINED')),
         getById: () => okAsync(buildDetail('DECLINED', null)),
@@ -162,7 +176,7 @@ describe('TransactionsController.create', () => {
 
   it('throws the mapped HttpException when create() itself fails, without calling getById', async () => {
     const getById = jest.fn();
-    const controller = new TransactionsController(
+    const controller = buildController(
       fakePort({ create: () => errAsync(new OutOfStock('prod-1', 2)), getById }),
     );
 
@@ -174,7 +188,7 @@ describe('TransactionsController.create', () => {
   });
 
   it('throws the mapped HttpException when the follow-up getById fails', async () => {
-    const controller = new TransactionsController(
+    const controller = buildController(
       fakePort({ getById: () => errAsync(new RepositoryError('connection lost')) }),
     );
 
@@ -186,7 +200,7 @@ describe('TransactionsController.create', () => {
 
 describe('TransactionsController.getById', () => {
   it('returns the full detail response including customer and delivery', async () => {
-    const controller = new TransactionsController(fakePort());
+    const controller = buildController(fakePort());
 
     const result = await controller.getById('trx-1');
 
@@ -195,7 +209,7 @@ describe('TransactionsController.getById', () => {
   });
 
   it('returns card: null when there is no payment yet (still PENDING)', async () => {
-    const controller = new TransactionsController(
+    const controller = buildController(
       fakePort({ getById: () => okAsync(buildDetail('PENDING', null)) }),
     );
 
@@ -206,7 +220,7 @@ describe('TransactionsController.getById', () => {
   });
 
   it('throws a 404 HttpException for TransactionNotFound', async () => {
-    const controller = new TransactionsController(
+    const controller = buildController(
       fakePort({ getById: () => errAsync(new TransactionNotFound('unknown-id')) }),
     );
 

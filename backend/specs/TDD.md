@@ -260,6 +260,41 @@ exported in the shell — harmless in the actual container, where Docker Compose
 - `CheckoutModule` wires every port to its adapter (`useClass`, keyed by the
   ports' Symbol tokens) — see `checkout.module.ts`. `HttpModule` (from
   `@nestjs/axios`) is imported there for `HttpPaymentGatewayAdapter`.
+- `helmet()` for baseline security headers (HSTS, `X-Content-Type-Options`,
+  `X-Frame-Options`, CSP, etc. — same OWASP list as CloudFront's response
+  headers policy in infra/specs/SPEC.md; this covers it at the origin too).
+- `initSentry()` runs before the app is even created — `Sentry.init` just needs
+  `SENTRY_DSN` in `process.env`; an empty/unset DSN makes the SDK a safe no-op.
+- `app.useLogger(app.get(Logger))`, with `bufferLogs: true` on `NestFactory.create`
+  so bootstrap logs (before the logger is wired) aren't lost to the console.
+
+## Cross-cutting: logging, redaction, correlation id, error monitoring
+
+- `shared/logger/pino.config.ts`: `LoggerModule.forRoot(pinoConfig)` (imported in
+  `AppModule`, not `CheckoutModule` — it's app-wide, not checkout-specific).
+  - `redact`: exact dot-paths, censoring to `[Redacted]` — `cmd.cardToken`,
+    `cmd.paymentAcceptanceToken`, `cmd.customer.email`, `cmd.customer.phone`,
+    `cmd.delivery.address`, `req.headers.authorization`. The `cmd.*` paths match
+    the one deliberate log call that exists today (`TransactionsController.create`
+    logs the incoming command at `debug` for troubleshooting) — pino's redact
+    needs the exact shape of whatever gets logged, so this list grows whenever a
+    new log call introduces a new sensitive shape.
+  - `genReqId`: reuses an inbound `X-Request-Id` header when present (so a
+    request stays correlated across CloudFront/ALB and this service's own logs),
+    otherwise mints a UUID. Every log line for that request carries it as `req.id`
+    — that's the correlation id, no extra middleware needed.
+- `shared/sentry/sentry.bootstrap.ts`: `initSentry()` wires `beforeSend` to
+  `redactSensitiveData`, a recursive walker (not exact paths, unlike pino) that
+  strips the same PII categories (`cardToken`, `paymentAcceptanceToken`, `email`,
+  `phone`, `address`) wherever they appear in a Sentry event's shape, which is
+  far less predictable than a single log call's payload.
+- `shared/sentry/sentry-exception.filter.ts`: a global `@Catch()` filter.
+  Domain errors already arrive as a well-formed `HttpException` (from
+  `http-error.mapper.ts`) — those are expected outcomes, passed straight
+  through. Anything else is an actual bug that escaped the `Result`/ROP chain;
+  that's the only case reported to `Sentry.captureException`, and the client
+  still only ever sees a generic 500 (`INTERNAL_ERROR`), never the real
+  exception — same "no raw exception to the client" rule as `GATEWAY_ERROR`.
 
 ## A build gotcha worth knowing
 
