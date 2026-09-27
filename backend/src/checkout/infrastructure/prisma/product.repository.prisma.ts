@@ -1,25 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import type { Product as ProductRow } from '@prisma/client';
 import { errAsync, okAsync, ResultAsync } from 'neverthrow';
 import type { Product } from '../../domain/entities';
 import { ProductNotFound } from '../../domain/errors';
 import type { ProductRepository } from '../../ports/outbound/product.repository';
-import { decimalToNumber } from './decimal';
+import { productToDomain as toDomain } from './mappers';
 import { PrismaService } from './prisma.service';
-
-function toDomain(row: ProductRow): Product {
-  return {
-    id: row.id,
-    name: row.name,
-    description: row.description,
-    unitPriceAmount: row.unitPriceAmount,
-    taxRate: decimalToNumber(row.taxRate),
-    stock: row.stock,
-    imageUrl: row.imageUrl,
-    isFeatured: row.isFeatured,
-    currency: row.currency,
-  };
-}
 
 @Injectable()
 export class ProductRepositoryPrisma implements ProductRepository {
