@@ -260,4 +260,48 @@ describe('TransactionRepositoryPrisma (integration)', () => {
       if (result.isErr()) expect(result.error.type).toBe('TRANSACTION_NOT_FOUND');
     });
   });
+
+  describe('findByIdWithDetails', () => {
+    it('errs with TransactionNotFound for an unknown id', async () => {
+      const result = await repo.findByIdWithDetails('00000000-0000-0000-0000-000000000000');
+      expect(result.isErr()).toBe(true);
+      if (result.isErr()) expect(result.error.type).toBe('TRANSACTION_NOT_FOUND');
+    });
+
+    it('joins the transaction with its customer, delivery and payment in one read', async () => {
+      const product = await createProduct(5);
+      const created = await repo.createPending(
+        buildData(product.id, {
+          customer: { firstName: 'Jane', lastName: 'Doe', email: 'jane.details@example.com', phone: '+571' },
+          delivery: { address: 'Calle 123', city: 'Bogotá' },
+        }),
+      );
+      if (created.isErr()) throw new Error('setup failed');
+      await repo.updateResult(created.value.id, {
+        status: 'APPROVED',
+        payment: { gatewayReference: 'gw-1', cardLast4: '4242', cardBrand: 'VISA' },
+      });
+
+      const result = await repo.findByIdWithDetails(created.value.id);
+
+      expect(result.isOk()).toBe(true);
+      if (result.isOk()) {
+        expect(result.value.transaction.id).toBe(created.value.id);
+        expect(result.value.customer.email).toBe('jane.details@example.com');
+        expect(result.value.delivery.city).toBe('Bogotá');
+        expect(result.value.payment?.gatewayReference).toBe('gw-1');
+      }
+    });
+
+    it('returns payment: null for a still-PENDING transaction', async () => {
+      const product = await createProduct(5);
+      const created = await repo.createPending(buildData(product.id));
+      if (created.isErr()) throw new Error('setup failed');
+
+      const result = await repo.findByIdWithDetails(created.value.id);
+
+      expect(result.isOk()).toBe(true);
+      if (result.isOk()) expect(result.value.payment).toBeNull();
+    });
+  });
 });

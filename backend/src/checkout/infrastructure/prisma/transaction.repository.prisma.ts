@@ -1,7 +1,19 @@
 import { Injectable } from '@nestjs/common';
-import type { Transaction as TransactionRow } from '@prisma/client';
+import type {
+  Customer as CustomerRow,
+  Delivery as DeliveryRow,
+  Payment as PaymentRow,
+  Transaction as TransactionRow,
+} from '@prisma/client';
 import { errAsync, okAsync, ResultAsync } from 'neverthrow';
-import { Transaction, type TransactionProps } from '../../domain/entities';
+import {
+  Transaction,
+  type Customer,
+  type Delivery,
+  type Payment,
+  type TransactionDetail,
+  type TransactionProps,
+} from '../../domain/entities';
 import { OutOfStock, ProductNotFound, RepositoryError, TransactionNotFound } from '../../domain/errors';
 import type {
   NewTransactionData,
@@ -34,6 +46,34 @@ function toDomain(row: TransactionRow): Transaction {
     updatedAt: row.updatedAt,
   };
   return new Transaction(props);
+}
+
+function toCustomerDomain(row: CustomerRow): Customer {
+  return { id: row.id, firstName: row.firstName, lastName: row.lastName, email: row.email, phone: row.phone };
+}
+
+function toDeliveryDomain(row: DeliveryRow): Delivery {
+  return {
+    id: row.id,
+    transactionId: row.transactionId,
+    address: row.address,
+    city: row.city,
+    region: row.region,
+    postalCode: row.postalCode,
+    notes: row.notes,
+  };
+}
+
+function toPaymentDomain(row: PaymentRow): Payment {
+  return {
+    id: row.id,
+    transactionId: row.transactionId,
+    cardLast4: row.cardLast4,
+    cardBrand: row.cardBrand,
+    gatewayReference: row.gatewayReference,
+    declineReason: row.declineReason,
+    errorReason: row.errorReason,
+  };
 }
 
 // Prisma's `$transaction(async (tx) => ...)` rolls back on a thrown exception, not
@@ -71,6 +111,26 @@ export class TransactionRepositoryPrisma implements TransactionRepository {
       this.prisma.transaction.findUnique({ where: { id } }),
       () => new TransactionNotFound(id),
     ).andThen((row) => (row ? okAsync(toDomain(row)) : errAsync(new TransactionNotFound(id))));
+  }
+
+  findByIdWithDetails(id: string): ResultAsync<TransactionDetail, TransactionNotFound> {
+    return ResultAsync.fromPromise(
+      this.prisma.transaction.findUnique({
+        where: { id },
+        include: { customer: true, delivery: true, payment: true },
+      }),
+      () => new TransactionNotFound(id),
+    ).andThen((row) => {
+      if (!row) return errAsync(new TransactionNotFound(id));
+      return okAsync({
+        transaction: toDomain(row),
+        customer: toCustomerDomain(row.customer),
+        // `delivery` is created atomically with the transaction in `createPending`
+        // and never deleted — Prisma's back-relation type is nullable, reality isn't.
+        delivery: toDeliveryDomain(row.delivery!),
+        payment: row.payment ? toPaymentDomain(row.payment) : null,
+      });
+    });
   }
 
   createPending(data: NewTransactionData): ResultAsync<Transaction, OutOfStock | ProductNotFound | RepositoryError> {

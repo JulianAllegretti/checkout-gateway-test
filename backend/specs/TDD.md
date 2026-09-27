@@ -29,8 +29,10 @@ backend/
         errors/              # OutOfStock, PaymentDeclined, GatewayError, InvalidTransition, ...
       ports/
         inbound/            # TransactionsPort, ProductsPort
-        outbound/            # ProductRepository, CustomerRepository, DeliveryRepository,
-                             # TransactionRepository, PaymentRepository, PaymentGatewayPort
+        outbound/            # ProductRepository, TransactionRepository, PaymentGatewayPort
+                             # (customers/deliveries/payments have no repository of
+                             # their own — see ARD.md; TransactionRepository reads
+                             # them joined via findByIdWithDetails)
       application/
         transactions.service.ts   # implements TransactionsPort
         products.service.ts        # implements ProductsPort
@@ -193,7 +195,7 @@ and coupled to code, not data-driven.
 // ports/inbound/transactions.port.ts
 interface TransactionsPort {
   create(cmd: CreateTransactionCommand): ResultAsync<Transaction, CreateTransactionError>;
-  getById(id: string): ResultAsync<Transaction, TransactionNotFound>;
+  getById(id: string): ResultAsync<TransactionDetail, TransactionNotFound>;
 }
 type CreateTransactionError =
   | ProductNotFound | OutOfStock | PaymentDeclined | GatewayError | ValidationError;
@@ -203,11 +205,15 @@ interface ProductsPort {
   getCurrent(): ResultAsync<Product, ProductNotFound>;
 }
 
-// ports/outbound/*.repository.ts — one per entity, e.g.:
+// ports/outbound/transaction.repository.ts
 interface TransactionRepository {
   findByIdempotencyKey(key: string): ResultAsync<Transaction | null, RepositoryError>;
   createPending(data: NewTransaction): ResultAsync<Transaction, OutOfStock | RepositoryError>;
   updateResult(id: string, result: TransactionResult): ResultAsync<Transaction, InvalidTransition | RepositoryError>;
+  findById(id: string): ResultAsync<Transaction, TransactionNotFound>;
+  // Joins customer + delivery + payment in one Prisma `include` read — see ARD.md
+  // for why those three don't get their own repository.
+  findByIdWithDetails(id: string): ResultAsync<TransactionDetail, TransactionNotFound>;
 }
 
 // ports/outbound/payment-gateway.port.ts
