@@ -98,9 +98,10 @@ in the seed.
 
 No accounts, no auth (out of scope per PRD) — but `email` is still the identity key
 for a repeat buyer: it's `UNIQUE`, and checkout does a find-or-create by email rather
-than inserting a new row every purchase. On a repeat purchase, `first_name`/
-`last_name`/`phone` are overwritten with the latest submission (a stale name from a
-past order isn't preferable to what the customer just typed).
+than inserting a new row every purchase. A match is never updated: since there's no
+way to verify the submitter actually owns that email, letting a checkout form
+overwrite another customer's stored name/phone would be a spoofing vector. Only the
+first submission's details are kept.
 
 | Column | Type | Notes |
 |---|---|---|

@@ -220,9 +220,9 @@ interface PaymentGatewayPort {
 
 1. `findByIdempotencyKey` → if found, short-circuit and return it (idempotency).
 2. `createPending` → atomic `stock -= quantity WHERE stock >= quantity` + find-or-create
-   `customers` by email (refreshing name/phone on a repeat buyer) + insert
-   `deliveries`, `transactions` (PENDING) in one DB transaction. 0 rows affected on the
-   stock update → `OutOfStock`.
+   `customers` by email (never overwriting an existing match — no auth to verify
+   ownership of that email) + insert `deliveries`, `transactions` (PENDING) in one DB
+   transaction. 0 rows affected on the stock update → `OutOfStock`.
 3. `PaymentGatewayPort.charge` with the tokenized card.
 4. On success: `updateResult` → `APPROVED`/`DECLINED`, write the `payments` row.
 5. On `DECLINED` or a thrown/technical failure (→ `ERROR`): `updateResult` +

@@ -126,7 +126,7 @@ describe('TransactionRepositoryPrisma (integration)', () => {
       expect(await prisma.transaction.count()).toBe(1);
     });
 
-    it('reuses the existing customer by email instead of duplicating it, refreshing stale contact details', async () => {
+    it('reuses the existing customer by email instead of duplicating it, without overwriting their stored details', async () => {
       const product = await createProduct(5);
 
       const first = await repo.createPending(
@@ -148,10 +148,12 @@ describe('TransactionRepositoryPrisma (integration)', () => {
         expect(second.value.toProps().customerId).toBe(first.value.toProps().customerId);
       }
 
+      // No auth to verify who's submitting the form, so a match by email never
+      // overwrites what's stored — only the first submission's details persist.
       const customer = await prisma.customer.findUniqueOrThrow({ where: { email: 'jane@example.com' } });
-      expect(customer.firstName).toBe('Jane R.');
-      expect(customer.lastName).toBe('Roe');
-      expect(customer.phone).toBe('+572');
+      expect(customer.firstName).toBe('Jane');
+      expect(customer.lastName).toBe('Doe');
+      expect(customer.phone).toBe('+571');
     });
   });
 

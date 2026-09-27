@@ -85,18 +85,13 @@ export class TransactionRepositoryPrisma implements TransactionRepository {
       if (reserved.count === 0) throw new OutOfStockSignal(data.productId, data.quantity);
 
       // Find-or-create by email: `customers` is keyed by email (unique in the
-      // schema), not re-created per purchase. Contact details are updated to the
-      // latest submission on repeat purchases, since a stale name/phone from a
-      // previous order isn't preferable to what the customer just typed.
-      const customer = await tx.customer.upsert({
-        where: { email: data.customer.email },
-        create: data.customer,
-        update: {
-          firstName: data.customer.firstName,
-          lastName: data.customer.lastName,
-          phone: data.customer.phone,
-        },
-      });
+      // schema), not re-created per purchase. Never updated on a match — there's
+      // no auth here, so anyone typing a known email at checkout could otherwise
+      // overwrite that person's stored name/phone. Stale contact info is the
+      // safer failure mode than a spoofable one.
+      const customer =
+        (await tx.customer.findUnique({ where: { email: data.customer.email } })) ??
+        (await tx.customer.create({ data: data.customer }));
 
       const transaction = await tx.transaction.create({
         data: {
