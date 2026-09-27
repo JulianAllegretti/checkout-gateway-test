@@ -4,6 +4,7 @@ import {
   OutOfStock,
   PaymentDeclined,
   ProductNotFound,
+  RepositoryError,
   TransactionAlreadyResolved,
   TransactionNotFound,
   ValidationError,
@@ -56,10 +57,19 @@ describe('domain errors', () => {
   });
 
   it('PaymentDeclined', () => {
-    const error = new PaymentDeclined('insufficient_funds');
+    const error = new PaymentDeclined('insufficient_funds', 'gw-ref-1', '4242', 'VISA');
     expect(error.type).toBe('PAYMENT_DECLINED');
     expect(error.reason).toBe('insufficient_funds');
+    expect(error.gatewayReference).toBe('gw-ref-1');
+    expect(error.cardLast4).toBe('4242');
+    expect(error.cardBrand).toBe('VISA');
     expect(error.message).toContain('insufficient_funds');
+  });
+
+  it('PaymentDeclined without gateway/card details', () => {
+    const error = new PaymentDeclined('insufficient_funds');
+    expect(error.gatewayReference).toBeUndefined();
+    expect(error.cardLast4).toBeUndefined();
   });
 
   it('GatewayError', () => {
@@ -67,5 +77,12 @@ describe('domain errors', () => {
     expect(error.type).toBe('GATEWAY_ERROR');
     expect(error.reason).toBe('timeout');
     expect(error.message).toContain('timeout');
+  });
+
+  it('RepositoryError', () => {
+    const error = new RepositoryError('connection refused');
+    expect(error.type).toBe('REPOSITORY_ERROR');
+    expect(error.reason).toBe('connection refused');
+    expect(error.message).toContain('connection refused');
   });
 });

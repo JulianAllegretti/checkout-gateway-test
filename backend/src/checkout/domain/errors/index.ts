@@ -6,12 +6,14 @@ export * from './transaction-already-resolved.error';
 export * from './invalid-transition.error';
 export * from './payment-declined.error';
 export * from './gateway.error';
+export * from './repository.error';
 
 import { GatewayError } from './gateway.error';
 import { InvalidTransition } from './invalid-transition.error';
 import { OutOfStock } from './out-of-stock.error';
 import { PaymentDeclined } from './payment-declined.error';
 import { ProductNotFound } from './product-not-found.error';
+import { RepositoryError } from './repository.error';
 import { TransactionAlreadyResolved } from './transaction-already-resolved.error';
 import { TransactionNotFound } from './transaction-not-found.error';
 import { ValidationError } from './validation-error';
@@ -24,4 +26,5 @@ export type DomainError =
   | TransactionAlreadyResolved
   | InvalidTransition
   | PaymentDeclined
-  | GatewayError;
+  | GatewayError
+  | RepositoryError;
