@@ -244,9 +244,12 @@ Each arrow is a `.andThen`; the whole chain is one `ResultAsync`, matching ADR 0
   ports (no DB, no HTTP) — covers the full `create` chain for
   approved/declined/error/out-of-stock/idempotent-retry paths without mocking
   frameworks.
-- `infrastructure`: narrower tests per adapter — Prisma repositories against a test
-  DB or mocked client (whichever keeps CI fast), `HttpPaymentGatewayAdapter` against
-  a mocked `axios` verifying the exception→`Result` conversion.
+- `infrastructure`: Prisma repositories are tested against a **real** local/CI
+  Postgres (`--runInBand`, since these spec files share one DB and can't run as
+  parallel workers) — mocking `$transaction(async (tx) => ...)` faithfully is
+  fragile and wouldn't verify the atomic stock-reservation query actually works.
+  `HttpPaymentGatewayAdapter` is tested against a mocked `axios`, verifying the
+  exception→`Result` conversion (no real network call needed there).
 - `interface`: controller tests verifying the exhaustive switch maps each domain
   error to the right HTTP status.
 - `jest.config.js`: `coverageThreshold.global` at 80% for branches/functions/lines/
