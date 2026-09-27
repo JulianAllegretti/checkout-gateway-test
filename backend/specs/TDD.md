@@ -29,8 +29,10 @@ backend/
         errors/              # OutOfStock, PaymentDeclined, GatewayError, InvalidTransition, ...
       ports/
         inbound/            # TransactionsPort, ProductsPort
-        outbound/            # ProductRepository, CustomerRepository, DeliveryRepository,
-                             # TransactionRepository, PaymentRepository, PaymentGatewayPort
+        outbound/            # ProductRepository, TransactionRepository, PaymentGatewayPort
+                             # (customers/deliveries/payments have no repository of
+                             # their own — see ARD.md; TransactionRepository reads
+                             # them joined via findByIdWithDetails)
       application/
         transactions.service.ts   # implements TransactionsPort
         products.service.ts        # implements ProductsPort
@@ -123,7 +125,7 @@ model Customer {
   id           String        @id @default(uuid())
   firstName    String        @map("first_name")
   lastName     String        @map("last_name")
-  email        String
+  email        String        @unique
   phone        String
   transactions Transaction[]
 
@@ -193,7 +195,7 @@ and coupled to code, not data-driven.
 // ports/inbound/transactions.port.ts
 interface TransactionsPort {
   create(cmd: CreateTransactionCommand): ResultAsync<Transaction, CreateTransactionError>;
-  getById(id: string): ResultAsync<Transaction, TransactionNotFound>;
+  getById(id: string): ResultAsync<TransactionDetail, TransactionNotFound>;
 }
 type CreateTransactionError =
   | ProductNotFound | OutOfStock | PaymentDeclined | GatewayError | ValidationError;
@@ -203,11 +205,15 @@ interface ProductsPort {
   getCurrent(): ResultAsync<Product, ProductNotFound>;
 }
 
-// ports/outbound/*.repository.ts — one per entity, e.g.:
+// ports/outbound/transaction.repository.ts
 interface TransactionRepository {
   findByIdempotencyKey(key: string): ResultAsync<Transaction | null, RepositoryError>;
   createPending(data: NewTransaction): ResultAsync<Transaction, OutOfStock | RepositoryError>;
   updateResult(id: string, result: TransactionResult): ResultAsync<Transaction, InvalidTransition | RepositoryError>;
+  findById(id: string): ResultAsync<Transaction, TransactionNotFound>;
+  // Joins customer + delivery + payment in one Prisma `include` read — see ARD.md
+  // for why those three don't get their own repository.
+  findByIdWithDetails(id: string): ResultAsync<TransactionDetail, TransactionNotFound>;
 }
 
 // ports/outbound/payment-gateway.port.ts
@@ -219,9 +225,10 @@ interface PaymentGatewayPort {
 ## `TransactionsService.create` — ROP chain
 
 1. `findByIdempotencyKey` → if found, short-circuit and return it (idempotency).
-2. `createPending` → atomic `stock -= quantity WHERE stock >= quantity` + insert
-   `customers`, `deliveries`, `transactions` (PENDING) in one DB transaction. 0 rows
-   affected on the stock update → `OutOfStock`.
+2. `createPending` → atomic `stock -= quantity WHERE stock >= quantity` + find-or-create
+   `customers` by email (never overwriting an existing match — no auth to verify
+   ownership of that email) + insert `deliveries`, `transactions` (PENDING) in one DB
+   transaction. 0 rows affected on the stock update → `OutOfStock`.
 3. `PaymentGatewayPort.charge` with the tokenized card.
 4. On success: `updateResult` → `APPROVED`/`DECLINED`, write the `payments` row.
 5. On `DECLINED` or a thrown/technical failure (→ `ERROR`): `updateResult` +
@@ -244,9 +251,12 @@ Each arrow is a `.andThen`; the whole chain is one `ResultAsync`, matching ADR 0
   ports (no DB, no HTTP) — covers the full `create` chain for
   approved/declined/error/out-of-stock/idempotent-retry paths without mocking
   frameworks.
-- `infrastructure`: narrower tests per adapter — Prisma repositories against a test
-  DB or mocked client (whichever keeps CI fast), `HttpPaymentGatewayAdapter` against
-  a mocked `axios` verifying the exception→`Result` conversion.
+- `infrastructure`: Prisma repositories are tested against a **real** local/CI
+  Postgres (`--runInBand`, since these spec files share one DB and can't run as
+  parallel workers) — mocking `$transaction(async (tx) => ...)` faithfully is
+  fragile and wouldn't verify the atomic stock-reservation query actually works.
+  `HttpPaymentGatewayAdapter` is tested against a mocked `axios`, verifying the
+  exception→`Result` conversion (no real network call needed there).
 - `interface`: controller tests verifying the exhaustive switch maps each domain
   error to the right HTTP status.
 - `jest.config.js`: `coverageThreshold.global` at 80% for branches/functions/lines/

@@ -1,5 +1,5 @@
 import type { ResultAsync } from 'neverthrow';
-import type { Transaction, TransactionStatus } from '../../domain/entities';
+import type { Transaction, TransactionDetail, TransactionStatus } from '../../domain/entities';
 import type { OutOfStock, ProductNotFound, RepositoryError, TransactionNotFound } from '../../domain/errors';
 
 export const TRANSACTION_REPOSITORY = Symbol('TransactionRepository');
@@ -67,4 +67,6 @@ export interface TransactionRepository {
   createPending(data: NewTransactionData): ResultAsync<Transaction, OutOfStock | ProductNotFound | RepositoryError>;
   updateResult(id: string, resolution: TransactionResolution): ResultAsync<Transaction, RepositoryError>;
   findById(id: string): ResultAsync<Transaction, TransactionNotFound>;
+  /** Single-query read (customer + delivery + payment joined) for `GET /transactions/:id`. */
+  findByIdWithDetails(id: string): ResultAsync<TransactionDetail, TransactionNotFound>;
 }

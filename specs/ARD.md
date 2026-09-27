@@ -34,10 +34,19 @@ Ports are split by direction, as in "textbook" hexagonal architecture:
 |---|---|---|
 | `domain` | Entities (`Product`, `Transaction`, `Customer`, `Delivery`, `Payment`), value objects (`Money`), domain errors (`OutOfStock`, `PaymentDeclined`, `GatewayError`, `InvalidTransition`...), the `Transaction.transitionTo` state machine | Nothing (pure TS) |
 | `ports/inbound` | One driving interface per **resource**, not per use case: `TransactionsPort` (`create(cmd)`, `getById(id)`), `ProductsPort` (`getCurrent()`). What the outside world is allowed to ask the application to do | `domain` types only |
-| `ports/outbound` | Driven interfaces the application needs from the outside world: `ProductRepository`, `CustomerRepository`, `DeliveryRepository`, `TransactionRepository`, `PaymentRepository`, `PaymentGatewayPort` | `domain` types only |
+| `ports/outbound` | Driven interfaces the application needs from the outside world: `ProductRepository`, `TransactionRepository` (its `findByIdWithDetails` joins customer/delivery/payment in one read — see below), `PaymentGatewayPort` | `domain` types only |
 | `application` | One service class per resource implementing its `ports/inbound` interface (`TransactionsService implements TransactionsPort`, `ProductsService implements ProductsPort`). Each method is a single ROP chain (`neverthrow`) against `ports/outbound` — the method *is* the use case, no separate use-case class per method | `domain`, `ports` (interfaces only) |
 | `infrastructure` | Outbound adapters implementing `ports/outbound`: ORM repositories (Postgres), `HttpPaymentGatewayAdapter` (axios, wraps calls with `ResultAsync.fromPromise` to turn exceptions into `GatewayError`) | `ports/outbound`, external libs |
 | `interface` | Inbound adapter: NestJS controllers + DTOs (`class-validator`), one controller per resource, depending on that resource's `ports/inbound` interface (injected by token, not the concrete service class). Only job: call the port, then an exhaustive `switch` on the `Result`'s error type → HTTP status (see ADR 0001's mapping table) | `ports/inbound` |
+
+`customers`, `deliveries` and `payments` don't get their own outbound repository —
+they're only ever written as part of `TransactionRepository.createPending`/
+`updateResult`, and only ever read together, alongside the transaction, for
+`GET /transactions/:id`. Giving each its own repository port would mean the
+application layer re-assembling them with N extra round trips to do what one SQL
+join already does — real abstraction cost for no real benefit here, since nothing
+in this app ever needs one of them in isolation. `TransactionRepository` owns the
+join internally (Prisma `include`) and returns a composed `TransactionDetail`.
 
 Suggested module layout (single bounded context is enough for this scope):
 

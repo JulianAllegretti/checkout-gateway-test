@@ -31,7 +31,7 @@ erDiagram
         uuid id PK
         text first_name
         text last_name
-        text email
+        text email UK
         text phone
     }
     TRANSACTIONS {
@@ -96,16 +96,19 @@ in the seed.
 
 ### `customers`
 
-Created together with the transaction at checkout time. No accounts, no auth (out of
-scope per PRD), so there's no uniqueness constraint on `email` — a repeat buyer just
-creates a new row. Acceptable because the app never looks customers up by identity.
+No accounts, no auth (out of scope per PRD) — but `email` is still the identity key
+for a repeat buyer: it's `UNIQUE`, and checkout does a find-or-create by email rather
+than inserting a new row every purchase. A match is never updated: since there's no
+way to verify the submitter actually owns that email, letting a checkout form
+overwrite another customer's stored name/phone would be a spoofing vector. Only the
+first submission's details are kept.
 
 | Column | Type | Notes |
 |---|---|---|
 | `id` | uuid PK | |
 | `first_name` | text | |
 | `last_name` | text | |
-| `email` | text | |
+| `email` | text | `UNIQUE` |
 | `phone` | text | |
 
 ### `deliveries`

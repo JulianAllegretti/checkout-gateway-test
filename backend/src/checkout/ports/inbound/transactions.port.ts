@@ -1,5 +1,5 @@
 import type { ResultAsync } from 'neverthrow';
-import type { Transaction } from '../../domain/entities';
+import type { Transaction, TransactionDetail } from '../../domain/entities';
 import type {
   GatewayError,
   OutOfStock,
@@ -45,5 +45,5 @@ export type CreateTransactionError =
 
 export interface TransactionsPort {
   create(cmd: CreateTransactionCommand): ResultAsync<Transaction, CreateTransactionError>;
-  getById(id: string): ResultAsync<Transaction, TransactionNotFound>;
+  getById(id: string): ResultAsync<TransactionDetail, TransactionNotFound>;
 }

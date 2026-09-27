@@ -31,9 +31,16 @@ git push main (infra/**)    → terraform plan (PR) → terraform apply (main)
 
 | Workflow | On PR | On push to `main` |
 |---|---|---|
-| `backend.yml` | install, lint, `jest --coverage` (fails if < 80%) | build+push image to ECR, deploy via SSM |
+| `backend.yml` | install, lint, `prisma migrate deploy` against a `postgres:16-alpine` service container, `jest --coverage` (fails if < 80%) | build+push image to ECR, deploy via SSM |
 | `frontend.yml` | install, lint, `jest --coverage` (fails if < 80%) | `vite build`, `s3 sync`, CloudFront invalidation |
 | `infra.yml` | `terraform fmt -check`, `terraform validate`, `terraform plan` (posted as a PR comment) | `terraform apply` |
+
+`backend.yml`'s Postgres service is a disposable, default-credentials DB scoped to
+that CI job only — it never touches the SSM-stored production DB password, and
+needs no secrets. The backend's repository-layer tests run against a real Postgres
+rather than a mocked Prisma client (see [SPEC.md](../../backend/specs/SPEC.md)):
+mocking `$transaction(async (tx) => ...)` faithfully is fragile and wouldn't
+actually verify the atomic stock-reservation query works.
 
 Note: these workflows target `release/first-release` and `main` the same way any
 other branch's CI would — the branch model (feature → release → main, see this
