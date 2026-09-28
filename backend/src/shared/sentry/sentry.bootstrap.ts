@@ -3,7 +3,14 @@ import * as Sentry from '@sentry/node';
 // Same PII categories as pino.config.ts, but walked recursively — a Sentry event's
 // shape (breadcrumbs, request context, stack frames) isn't as predictable as a
 // single log call's payload, so exact dot-paths (pino's approach) don't fit here.
-const SENSITIVE_KEYS = new Set(['cardToken', 'paymentAcceptanceToken', 'email', 'phone', 'address']);
+const SENSITIVE_KEYS = new Set([
+  'cardToken',
+  'paymentAcceptanceToken',
+  'personalDataAuthToken',
+  'email',
+  'phone',
+  'address',
+]);
 const REDACTED = '[Redacted]';
 
 export function initSentry(): void {

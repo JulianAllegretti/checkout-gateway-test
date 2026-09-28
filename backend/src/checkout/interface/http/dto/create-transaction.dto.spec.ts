@@ -9,6 +9,7 @@ function validPayload(): Record<string, unknown> {
     quantity: 2,
     cardToken: 'tok_test',
     paymentAcceptanceToken: 'accept_token',
+    personalDataAuthToken: 'accept_personal_token',
     customer: { firstName: 'Jane', lastName: 'Doe', email: 'jane@example.com', phone: '+573001234567' },
     delivery: { address: 'Calle 123', city: 'Bogotá' },
   };

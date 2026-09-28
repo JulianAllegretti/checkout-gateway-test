@@ -75,10 +75,15 @@ export class CreateTransactionDto {
   @MinLength(1)
   cardToken!: string;
 
-  @ApiProperty({ example: 'eyJhbGciOi...' })
+  @ApiProperty({ description: 'The `termsToken` from GET /payment/acceptance-tokens.', example: 'eyJhbGciOi...' })
   @IsString()
   @MinLength(1)
   paymentAcceptanceToken!: string;
+
+  @ApiProperty({ description: 'The `personalDataToken` from GET /payment/acceptance-tokens.', example: 'eyJhbGciOi...' })
+  @IsString()
+  @MinLength(1)
+  personalDataAuthToken!: string;
 
   @ApiProperty({ type: CreateTransactionCustomerDto })
   @ValidateNested()

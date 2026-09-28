@@ -32,7 +32,8 @@ User ──HTTPS──► CloudFront ──┬── /*      → S3 (React SPA)
                                              ├── Nest backend
                                              └── Postgres (internal network only)
 Frontend ──(public key)──► Gateway: card tokenization
-Backend ──(private key)──► Gateway: create transaction / check status
+Backend ──(public key)───► Gateway: fetch consent tokens (no browser CORS support)
+Backend ──(private key)──► Gateway: create transaction / poll status until resolved
 ```
 
 ### EC2
@@ -86,10 +87,23 @@ Rules to keep the option of splitting into separate repos later:
 - The frontend tokenizes the card directly with the gateway using the public key.
   The card number and CVC never reach the backend; the backend only receives the
   token.
+- The habeas-data consent tokens (shown to the customer as two checkboxes before
+  charging, see PRD.md) are fetched by the backend instead, even though they only
+  need the public key like tokenization — found out empirically that the gateway's
+  merchant-info endpoint doesn't send CORS headers, so a direct browser call is
+  blocked regardless. `GET /payment/acceptance-tokens` is the backend acting as a
+  same-origin proxy for a call the frontend can't make itself, not a security
+  boundary (see specs/API-CONTRACT.md).
 - The integrity signature is generated on the backend, in the gateway adapter, right
   before charging: `SHA256(reference + amountInCents + currency + integritySecret)`,
   concatenated with no separator. `amountInCents` is the gateway's own convention
   (amount × 100), independent of `Money`'s peso-integer representation.
+- Every charge is created `PENDING` on the gateway's side and never resolves
+  synchronously (confirmed against the real sandbox, contrary to the original
+  assumption here) — the backend polls the gateway's status endpoint internally
+  (10 attempts, 5s apart) before responding, rather than surfacing `PENDING` to the
+  client and relying on it to poll. See specs/API-CONTRACT.md's `POST /transactions`
+  section.
 - Redux persist only stores: checkout step, transaction ID, delivery data and
   product. Never the PAN or CVC.
 - Pino redacts token, email, phone and address. Sentry uses `beforeSend` to filter

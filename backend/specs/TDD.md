@@ -36,6 +36,7 @@ backend/
       application/
         transactions.service.ts   # implements TransactionsPort
         products.service.ts        # implements ProductsPort
+        payment.service.ts         # implements PaymentPort
       infrastructure/
         prisma/                    # Prisma-based repository adapters
         gateway/                   # HttpPaymentGatewayAdapter
@@ -43,6 +44,7 @@ backend/
         http/
           products.controller.ts
           transactions.controller.ts
+          payment.controller.ts     # GET /payment/acceptance-tokens
           health.controller.ts
           dto/
     shared/
@@ -228,8 +230,23 @@ interface TransactionRepository {
 // ports/outbound/payment-gateway.port.ts
 interface PaymentGatewayPort {
   charge(req: ChargeRequest): ResultAsync<ChargeResult, PaymentDeclined | GatewayError>;
+  // The gateway's merchant-info endpoint has no browser CORS support — fetched
+  // here (server-side, public key) instead of by the frontend directly, purely
+  // to work around that, not for security. See PaymentPort below.
+  getAcceptanceTokens(): ResultAsync<AcceptanceTokens, GatewayError>;
+}
+
+// ports/inbound/payment.port.ts
+interface PaymentPort {
+  getAcceptanceTokens(): ResultAsync<AcceptanceTokens, GatewayError>;
 }
 ```
+
+`PaymentService implements PaymentPort` and `PaymentController` (`GET
+/payment/acceptance-tokens`) are the thinnest possible pass-through pair, mirroring
+`ProductsService`/`ProductsController` — this one has no business logic of its own,
+it exists only because the frontend can't reach the gateway's merchant-info endpoint
+itself.
 
 ## `TransactionsService.create` — ROP chain
 
@@ -238,7 +255,14 @@ interface PaymentGatewayPort {
    `customers` by email (never overwriting an existing match — no auth to verify
    ownership of that email) + insert `deliveries`, `transactions` (PENDING) in one DB
    transaction. 0 rows affected on the stock update → `OutOfStock`.
-3. `PaymentGatewayPort.charge` with the tokenized card.
+3. `PaymentGatewayPort.charge` with the tokenized card and both consent tokens
+   (`paymentAcceptanceToken`, `personalDataAuthToken`). Every charge is created
+   `PENDING` on the gateway's side and never resolves synchronously (confirmed
+   against the real sandbox) — `charge()` polls the gateway's own status endpoint
+   internally (10 attempts, 5s apart, plain `setTimeout`-based, not a queue/cron)
+   before returning, so this whole step can take up to roughly a minute in the
+   worst case. Exhausting the attempts while still `PENDING` is a `GatewayError`,
+   same as any other unexpected status.
 4. On a successful charge: `updateResult` → `APPROVED`, write the `payments` row.
 5. On a declined charge or a thrown/technical failure (→ `DECLINED`/`ERROR`):
    `updateResult` + restore stock (`stock += quantity`) in the same DB transaction
@@ -251,9 +275,11 @@ Each arrow is a `.andThen`; the whole chain is one `ResultAsync`, matching ADR 0
 
 ## Config (env vars)
 
-`DATABASE_URL`, `PAYMENT_API_URL`, `PAYMENT_PRIVATE_KEY`,
-`PAYMENT_INTEGRITY_SECRET`, `BASE_FEE_AMOUNT`, `DELIVERY_FEE_AMOUNT`, `PORT`,
-`SENTRY_DSN`, `LOG_LEVEL`. All in `.env.example` with placeholder values only.
+`DATABASE_URL`, `PAYMENT_API_URL`, `PAYMENT_PRIVATE_KEY`, `PAYMENT_PUBLIC_KEY`
+(not a secret — only needed backend-side because of the merchant-info endpoint's
+CORS gap, see PaymentGatewayPort above), `PAYMENT_INTEGRITY_SECRET`,
+`BASE_FEE_AMOUNT`, `DELIVERY_FEE_AMOUNT`, `PORT`, `SENTRY_DSN`, `LOG_LEVEL`. All in
+`.env.example` with placeholder values only.
 `main.ts` loads `.env` itself (`import 'dotenv/config'`) so `npm run start:dev`
 works standalone against the Dockerized Postgres, without needing the vars
 exported in the shell — harmless in the actual container, where Docker Compose's
@@ -284,8 +310,9 @@ exported in the shell — harmless in the actual container, where Docker Compose
 - `shared/logger/pino.config.ts`: `LoggerModule.forRoot(pinoConfig)` (imported in
   `AppModule`, not `CheckoutModule` — it's app-wide, not checkout-specific).
   - `redact`: exact dot-paths, censoring to `[Redacted]` — `cmd.cardToken`,
-    `cmd.paymentAcceptanceToken`, `cmd.customer.email`, `cmd.customer.phone`,
-    `cmd.delivery.address`, `req.headers.authorization`. The `cmd.*` paths match
+    `cmd.paymentAcceptanceToken`, `cmd.personalDataAuthToken`, `cmd.customer.email`,
+    `cmd.customer.phone`, `cmd.delivery.address`, `req.headers.authorization`. The
+    `cmd.*` paths match
     the one deliberate log call that exists today (`TransactionsController.create`
     logs the incoming command at `debug` for troubleshooting) — pino's redact
     needs the exact shape of whatever gets logged, so this list grows whenever a
@@ -296,8 +323,9 @@ exported in the shell — harmless in the actual container, where Docker Compose
     — that's the correlation id, no extra middleware needed.
 - `shared/sentry/sentry.bootstrap.ts`: `initSentry()` wires `beforeSend` to
   `redactSensitiveData`, a recursive walker (not exact paths, unlike pino) that
-  strips the same PII categories (`cardToken`, `paymentAcceptanceToken`, `email`,
-  `phone`, `address`) wherever they appear in a Sentry event's shape, which is
+  strips the same PII categories (`cardToken`, `paymentAcceptanceToken`,
+  `personalDataAuthToken`, `email`, `phone`, `address`) wherever they appear in a
+  Sentry event's shape, which is
   far less predictable than a single log call's payload.
 - `shared/sentry/sentry-exception.filter.ts`: a global `@Catch()` filter.
   Domain errors already arrive as a well-formed `HttpException` (from

@@ -36,6 +36,7 @@ describe('redactSensitiveData', () => {
       request: {
         data: {
           cardToken: 'tok_secret',
+          personalDataAuthToken: 'accept_personal_secret',
           customer: { email: 'jane@example.com', phone: '+571', firstName: 'Jane' },
         },
       },
@@ -45,6 +46,7 @@ describe('redactSensitiveData', () => {
     const redacted = redactSensitiveData(event) as typeof event;
 
     expect(redacted.request.data.cardToken).toBe('[Redacted]');
+    expect(redacted.request.data.personalDataAuthToken).toBe('[Redacted]');
     expect(redacted.request.data.customer.email).toBe('[Redacted]');
     expect(redacted.request.data.customer.phone).toBe('[Redacted]');
     expect(redacted.request.data.customer.firstName).toBe('Jane');

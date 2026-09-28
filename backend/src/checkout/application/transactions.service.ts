@@ -105,6 +105,7 @@ export class TransactionsService implements TransactionsPort {
         reference: props.reference,
         cardToken: cmd.cardToken,
         paymentAcceptanceToken: cmd.paymentAcceptanceToken,
+        personalDataAuthToken: cmd.personalDataAuthToken,
         customerEmail: cmd.customer.email,
         amount: props.totalAmount,
         currency: props.currency,

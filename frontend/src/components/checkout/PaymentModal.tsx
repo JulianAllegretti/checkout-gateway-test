@@ -9,7 +9,8 @@ import { useState } from 'react'
 import { FormProvider, useForm } from 'react-hook-form'
 import { useDispatch } from 'react-redux'
 import { z } from 'zod'
-import { getAcceptanceToken, tokenizeCard } from '../../lib/gatewayClient'
+import { tokenizeCard } from '../../lib/gatewayClient'
+import { useGetAcceptanceTokensQuery } from '../../features/checkout/api'
 import { customerInfoSubmitted } from '../../features/checkout/checkoutSlice'
 import {
   cardSchema,
@@ -37,6 +38,7 @@ export interface PaymentSecrets {
   cardBrand: CardBrand | null
   cardLast4: string
   paymentAcceptanceToken: string
+  personalDataAuthToken: string
 }
 
 export interface PaymentModalProps {
@@ -49,6 +51,14 @@ export interface PaymentModalProps {
 export function PaymentModal({ onSubmitted }: PaymentModalProps) {
   const dispatch = useDispatch()
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [termsAccepted, setTermsAccepted] = useState(false)
+  const [personalDataAccepted, setPersonalDataAccepted] = useState(false)
+  const {
+    data: acceptanceTokens,
+    isLoading: acceptanceTokensLoading,
+    isError: acceptanceTokensErrored,
+    refetch: refetchAcceptanceTokens,
+  } = useGetAcceptanceTokensQuery()
   const methods = useForm<PaymentFormValues>({
     resolver: zodResolver(paymentFormSchema),
     defaultValues: {
@@ -66,17 +76,19 @@ export function PaymentModal({ onSubmitted }: PaymentModalProps) {
   const { handleSubmit, formState } = methods
 
   async function onSubmit(values: PaymentFormValues) {
+    // Guarded defensively — the submit button is already disabled until both
+    // are true, but TypeScript can't see that from here.
+    if (!acceptanceTokens) return
+
     setSubmitError(null)
     try {
-      const [tokenized, paymentAcceptanceToken] = await Promise.all([
-        tokenizeCard(values.card),
-        getAcceptanceToken(),
-      ])
+      const tokenized = await tokenizeCard(values.card)
       onSubmitted({
         cardToken: tokenized.cardToken,
         cardBrand: tokenized.brand,
         cardLast4: tokenized.last4,
-        paymentAcceptanceToken,
+        paymentAcceptanceToken: acceptanceTokens.termsToken,
+        personalDataAuthToken: acceptanceTokens.personalDataToken,
       })
       dispatch(
         customerInfoSubmitted({
@@ -90,6 +102,13 @@ export function PaymentModal({ onSubmitted }: PaymentModalProps) {
       )
     }
   }
+
+  const canSubmit =
+    !acceptanceTokensLoading &&
+    !acceptanceTokensErrored &&
+    termsAccepted &&
+    personalDataAccepted &&
+    !formState.isSubmitting
 
   return (
     <Dialog open onClose={() => {}} className="relative z-10">
@@ -113,6 +132,72 @@ export function PaymentModal({ onSubmitted }: PaymentModalProps) {
               >
                 <CardForm />
                 <DeliveryForm />
+
+                <fieldset className="space-y-2">
+                  <legend className="mb-1 font-medium text-gray-900">
+                    Consent
+                  </legend>
+                  {acceptanceTokensLoading && (
+                    <p className="text-sm text-gray-500">Loading terms...</p>
+                  )}
+                  {acceptanceTokensErrored && (
+                    <div role="alert" className="text-sm text-red-600">
+                      <p>Could not load the terms and conditions.</p>
+                      <button
+                        type="button"
+                        onClick={() => refetchAcceptanceTokens()}
+                        className="font-medium underline"
+                      >
+                        Try again
+                      </button>
+                    </div>
+                  )}
+                  {acceptanceTokens && (
+                    <>
+                      <label className="flex items-start gap-2 text-sm text-gray-700">
+                        <input
+                          type="checkbox"
+                          className="mt-0.5"
+                          checked={termsAccepted}
+                          onChange={(e) => setTermsAccepted(e.target.checked)}
+                        />
+                        <span>
+                          I accept the{' '}
+                          <a
+                            href={acceptanceTokens.termsUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="underline"
+                          >
+                            terms and conditions
+                          </a>
+                        </span>
+                      </label>
+                      <label className="flex items-start gap-2 text-sm text-gray-700">
+                        <input
+                          type="checkbox"
+                          className="mt-0.5"
+                          checked={personalDataAccepted}
+                          onChange={(e) =>
+                            setPersonalDataAccepted(e.target.checked)
+                          }
+                        />
+                        <span>
+                          I authorize the{' '}
+                          <a
+                            href={acceptanceTokens.personalDataUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="underline"
+                          >
+                            handling of my personal data
+                          </a>
+                        </span>
+                      </label>
+                    </>
+                  )}
+                </fieldset>
+
                 {submitError && (
                   <p role="alert" className="text-sm text-red-600">
                     {submitError}
@@ -120,7 +205,7 @@ export function PaymentModal({ onSubmitted }: PaymentModalProps) {
                 )}
                 <button
                   type="submit"
-                  disabled={formState.isSubmitting}
+                  disabled={!canSubmit}
                   className="w-full rounded-lg bg-gray-900 px-4 py-3 font-medium text-white disabled:cursor-not-allowed disabled:bg-gray-300"
                 >
                   {formState.isSubmitting ? 'Validating...' : 'Continue'}

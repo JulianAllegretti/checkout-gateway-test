@@ -32,6 +32,7 @@ export interface CreateTransactionCommand {
   readonly quantity: number;
   readonly cardToken: string;
   readonly paymentAcceptanceToken: string;
+  readonly personalDataAuthToken: string;
   readonly customer: CreateTransactionCustomer;
   readonly delivery: CreateTransactionDelivery;
 }

@@ -118,6 +118,7 @@ export function toCommand(dto: CreateTransactionDto): CreateTransactionCommand {
     quantity: dto.quantity,
     cardToken: dto.cardToken,
     paymentAcceptanceToken: dto.paymentAcceptanceToken,
+    personalDataAuthToken: dto.personalDataAuthToken,
     customer: { ...dto.customer },
     delivery: { ...dto.delivery },
   };

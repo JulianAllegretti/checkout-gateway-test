@@ -45,6 +45,7 @@ function buildCommand(overrides: Partial<CreateTransactionCommand> = {}): Create
     quantity: 2,
     cardToken: 'tok_card',
     paymentAcceptanceToken: 'accept_token',
+    personalDataAuthToken: 'accept_personal_token',
     customer: { firstName: 'Jane', lastName: 'Doe', email: 'jane@example.com', phone: '+571' },
     delivery: { address: 'Calle 123', city: 'Bogotá' },
     ...overrides,
@@ -102,6 +103,8 @@ function fakeTransactionRepository(overrides: Partial<TransactionRepository> = {
 function fakePaymentGateway(overrides: Partial<PaymentGatewayPort> = {}): PaymentGatewayPort {
   return {
     charge: () => okAsync({ gatewayReference: 'gw-1', cardLast4: '4242', cardBrand: 'VISA' }),
+    getAcceptanceTokens: () =>
+      okAsync({ termsToken: 't', termsUrl: 'https://x/t.pdf', personalDataToken: 'p', personalDataUrl: 'https://x/p.pdf' }),
     ...overrides,
   };
 }
@@ -185,6 +188,17 @@ describe('TransactionsService.create', () => {
     expect(data.deliveryFeeAmount).toBe(8000);
     expect(data.totalAmount).toBe(251000);
     expect(data.reference).toBe('idem-1');
+  });
+
+  it('passes both consent tokens from the command through to the gateway charge', async () => {
+    const charge = jest.fn(() => okAsync({ gatewayReference: 'gw-1', cardLast4: '4242', cardBrand: 'VISA' }));
+    const service = buildService({ gateway: fakePaymentGateway({ charge }) });
+
+    await service.create(buildCommand({ paymentAcceptanceToken: 'terms_tok', personalDataAuthToken: 'personal_tok' }));
+
+    expect(charge).toHaveBeenCalledWith(
+      expect.objectContaining({ paymentAcceptanceToken: 'terms_tok', personalDataAuthToken: 'personal_tok' }),
+    );
   });
 
   it('resolves to APPROVED and returns Ok on a successful charge', async () => {

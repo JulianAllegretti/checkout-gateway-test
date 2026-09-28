@@ -13,7 +13,10 @@ gateway (sandbox mode only, no real money involved). See architecture decisions 
 2. **Credit card / delivery info** (modal or screen): validated card data (number,
    expiration, CVC, cardholder name; VISA/MasterCard brand detection is a plus) plus
    customer delivery information. Card data is fake but must follow the real
-   structure of a credit card.
+   structure of a credit card. Also requires two checkboxes (terms and conditions;
+   personal data handling authorization) the customer must accept before
+   continuing — a habeas-data consent requirement of the payment gateway, each
+   linking to its actual contract text.
 3. **Summary**: product amount (unit price + IVA — tax rate is per product, since
    some products in Colombia have a reduced or zero IVA rate) + fixed base fee +
    delivery fee, shown in a backdrop component, with a payment button.
