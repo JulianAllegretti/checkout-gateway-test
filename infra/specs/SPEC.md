@@ -55,6 +55,23 @@ repo's git history) doesn't change what infra triggers on, only when merges happ
 | Gateway private key / integrity secret | SSM Parameter Store (manually set once) | Git, Terraform `.tf`/`.tfvars` files, this spec, any repo file |
 | Gateway public key | Frontend build-time env var (`VITE_PAYMENT_PUBLIC_KEY`) — safe to expose, it can only tokenize, not charge | N/A, it's meant to be public |
 
+## Naming conventions (fixed by task 2, must match in later tasks)
+
+- SSM parameters live under `/${project_name}/${environment}/...`
+  (`/checkout/production/...` with the defaults in `variables.tf`) — task 6
+  creates `db_password`, `payment_api_url`, `payment_private_key`,
+  `payment_public_key` and `payment_integrity_secret` under that path.
+  `payment_api_url` is fetched from SSM rather than hardcoded anywhere in this
+  repo because its real value is the gateway's own domain (see CLAUDE.md).
+- The ECR repository is named `${project_name}-backend` (task 3) — the EC2
+  instance role's pull permissions and the deploy script's image reference
+  are already scoped to this exact name.
+- `infra/templates/deploy.sh.tpl` is written to `/opt/checkout/deploy.sh` on
+  the instance and is the single script both the first-boot `user_data` and
+  every later SSM Run Command deploy (task 8) invoke — it's idempotent
+  (install docker if missing, refresh `.env` from SSM, `docker compose pull
+  && up -d`), so there's no separate "install" vs. "update" script.
+
 ## Non-functional
 
 - HTTPS end-to-end (CloudFront terminates TLS; CloudFront→EC2 can stay HTTP inside
