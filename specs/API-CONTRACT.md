@@ -16,6 +16,9 @@ reference.
   call so the checkout stays atomic and easy to reason about for double-submit safety.
 - The card PAN and CVC **never** reach the backend. The frontend tokenizes the card
   directly with the gateway's public key and only sends the resulting `cardToken`.
+- The gateway's merchant-info endpoint (source of the two consent tokens below) has
+  no browser CORS support, unlike tokenization — `GET /payment/acceptance-tokens` is
+  our own endpoint, fetching them server-side on the frontend's behalf.
 - The backend never trusts client-sent amounts: `unitPrice`, `subtotal`, `taxRate`,
   `taxAmount`, `product`, `baseFee` and `deliveryFee` in the response are always
   recomputed server-side from the DB / config, never echoed back from the request.
@@ -44,6 +47,7 @@ reference.
 | `OUT_OF_STOCK` | 409 | Stock reservation failed at transaction creation (see ADR 0001) |
 | `INVALID_TRANSITION` | 409 | Internal state machine guard tripped (shouldn't reach the client in practice) |
 | `INTERNAL_ERROR` | 500 | Unexpected failure (e.g. a DB error) not covered by any of the above. `message` is always generic |
+| `GATEWAY_ERROR` | 502 | `GET /payment/acceptance-tokens` couldn't reach the gateway. Not returned by `POST /transactions` — a gateway failure there resolves the transaction as `status: "ERROR"` instead, see below |
 
 A declined charge or a technical failure to charge the card is **not** one of these
 error codes — `POST /transactions` still responds `201` in both cases, with
@@ -99,12 +103,36 @@ summary on screen 3.
 in Colombia have a reduced or zero IVA rate), so it's never assumed to be a fixed
 19% on the frontend.
 
+## `GET /payment/acceptance-tokens`
+
+The pair of habeas-data consent tokens the gateway requires on every charge —
+fetched once when the payment screen mounts, and shown to the customer as two
+required checkboxes (one per contract) before they can submit. See PRD.md.
+
+**Response `200`**
+```json
+{
+  "termsToken": "eyJhbGciOi...",
+  "termsUrl": "https://.../terms.pdf",
+  "personalDataToken": "eyJhbGciOi...",
+  "personalDataUrl": "https://.../personal-data.pdf"
+}
+```
+
+`termsToken`/`personalDataToken` are sent back as `paymentAcceptanceToken` /
+`personalDataAuthToken` on `POST /transactions`. The `*Url` fields are the actual
+contract text, for the checkbox labels to link to.
+
 ## `POST /transactions`
 
 Creates the customer + delivery + a `PENDING` transaction (reserving stock
-atomically), charges the card via the gateway, and returns the resulting status. If
-the gateway itself is asynchronous, the response may still be `PENDING` and the
-client must poll `GET /transactions/:id`.
+atomically), then charges the card via the gateway. Every charge is created
+`PENDING` on the gateway's side and never resolves synchronously — the backend
+polls the gateway's own status endpoint internally (server-side, up to 10 times,
+5 seconds apart) until it settles, before responding. In the worst case (the
+gateway never resolves) this endpoint can take roughly a minute to respond; the
+client's own polling of `GET /transactions/:id` remains in place as a resiliency
+fallback (e.g. a server restart mid-charge), not as the primary mechanism.
 
 **Request**
 ```json
@@ -114,6 +142,7 @@ client must poll `GET /transactions/:id`.
   "quantity": 2,
   "cardToken": "tok_...",
   "paymentAcceptanceToken": "eyJhbGciOi...",
+  "personalDataAuthToken": "eyJhbGciOi...",
   "customer": {
     "firstName": "Jane",
     "lastName": "Doe",
@@ -156,7 +185,10 @@ client must poll `GET /transactions/:id`.
 }
 ```
 
-`status` is one of `PENDING | APPROVED | DECLINED | ERROR`. When `status` is
+`status` is one of `PENDING | APPROVED | DECLINED | ERROR` (`PENDING` only appears
+here in the unlikely event of a server crash mid-charge — normally this endpoint
+doesn't respond until the gateway's own internal polling settles, see above). When
+`status` is
 `DECLINED` or `ERROR`, the response also includes a `reason` string (the gateway's
 decline reason, or a generic message for technical errors — never a raw
 exception/stack trace). A declined or failed charge is a normal `201`, not an error

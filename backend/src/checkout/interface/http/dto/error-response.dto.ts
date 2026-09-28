@@ -13,7 +13,6 @@ export class ErrorResponseDto {
       'TRANSACTION_NOT_FOUND',
       'OUT_OF_STOCK',
       'INVALID_TRANSITION',
-      'PAYMENT_DECLINED',
       'GATEWAY_ERROR',
       'INTERNAL_ERROR',
     ],

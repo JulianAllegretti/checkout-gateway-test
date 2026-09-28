@@ -48,25 +48,3 @@ export async function tokenizeCard(card: CardDraft): Promise<TokenizedCard> {
 
   return { cardToken: body.data.id, brand, last4: body.data.last_four }
 }
-
-/**
- * The privacy-policy acceptance token required by `POST /transactions`'
- * `paymentAcceptanceToken` field (see specs/API-CONTRACT.md). The gateway
- * also issues a separate personal-data-authorization token
- * (`accept_personal_auth`), but nothing in our current API contract consumes
- * it, so it's not fetched here.
- */
-export async function getAcceptanceToken(): Promise<string> {
-  const response = await fetch(`${env.paymentApiUrl}/merchants/info`, {
-    headers: { 'x-merchant-public-key': env.paymentPublicKey },
-  })
-
-  const body = (await parseOkJson(
-    response,
-    'Failed to fetch the payment acceptance token',
-  )) as {
-    data: { presigned_acceptance: { acceptance_token: string } }
-  }
-
-  return body.data.presigned_acceptance.acceptance_token
-}

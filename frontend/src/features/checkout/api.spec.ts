@@ -67,6 +67,28 @@ describe('api', () => {
     expect(result.data).toEqual(product)
   })
 
+  it('getAcceptanceTokens calls GET /api/payment/acceptance-tokens', async () => {
+    const tokens = {
+      termsToken: 'accept_terms_123',
+      termsUrl: 'https://example.com/terms.pdf',
+      personalDataToken: 'accept_personal_123',
+      personalDataUrl: 'https://example.com/personal-data.pdf',
+    }
+    mockFetchOnce(tokens)
+    const store = createTestStore()
+
+    const result = await store.dispatch(
+      api.endpoints.getAcceptanceTokens.initiate(),
+    )
+
+    const request = lastRequest()
+    expect(request.method).toBe('GET')
+    expect(new URL(request.url, 'http://localhost').pathname).toBe(
+      '/api/payment/acceptance-tokens',
+    )
+    expect(result.data).toEqual(tokens)
+  })
+
   it('createTransaction posts to /api/transactions with the request as the JSON body', async () => {
     const requestBody = {
       idempotencyKey: '6c1f6e2e-1b3a-4b3a-9b3a-1b3a4b3a9b3a',
@@ -74,6 +96,7 @@ describe('api', () => {
       quantity: 1,
       cardToken: 'tok_test_1',
       paymentAcceptanceToken: 'accept_123',
+      personalDataAuthToken: 'accept_personal_123',
       customer: {
         firstName: 'Jane',
         lastName: 'Doe',

@@ -47,6 +47,7 @@ const paymentSecrets: PaymentSecrets = {
   cardBrand: 'VISA',
   cardLast4: '1111',
   paymentAcceptanceToken: 'accept_123',
+  personalDataAuthToken: 'accept_personal_123',
 }
 
 function renderSummary(secrets: PaymentSecrets = paymentSecrets) {
@@ -143,6 +144,7 @@ describe('SummaryBackdrop', () => {
         quantity: 1,
         cardToken: 'tok_test_1',
         paymentAcceptanceToken: 'accept_123',
+        personalDataAuthToken: 'accept_personal_123',
         customer,
         delivery,
       }),

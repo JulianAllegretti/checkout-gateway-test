@@ -1,9 +1,9 @@
 import { HttpException, HttpStatus } from '@nestjs/common';
-import type { TransactionNotFound } from '../../domain/errors';
+import type { GatewayError, TransactionNotFound } from '../../domain/errors';
 import type { CreateTransactionError } from '../../ports/inbound/transactions.port';
 import { ErrorResponseDto } from './dto/error-response.dto';
 
-export type HttpMappableError = CreateTransactionError | TransactionNotFound;
+export type HttpMappableError = CreateTransactionError | TransactionNotFound | GatewayError;
 
 /**
  * The one exhaustive switch from a domain error to the HTTP error envelope (see
@@ -27,6 +27,12 @@ function toErrorBody(error: HttpMappableError): ErrorResponseDto {
       return build(HttpStatus.CONFLICT, error.type, error.message);
     case 'REPOSITORY_ERROR':
       return build(HttpStatus.INTERNAL_SERVER_ERROR, 'INTERNAL_ERROR', 'An internal error occurred');
+    case 'GATEWAY_ERROR':
+      // Only reachable from PaymentController — CreateTransactionError no longer
+      // includes GatewayError (see transactions.port.ts): a failed charge is a
+      // resolved transaction, not an HTTP error. Here, nothing was created at
+      // all, so a real error response is correct.
+      return build(HttpStatus.BAD_GATEWAY, error.type, 'The payment gateway is currently unreachable');
   }
 }
 

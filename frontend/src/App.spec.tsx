@@ -9,12 +9,11 @@ import checkoutReducer, {
   transactionCreated,
 } from './features/checkout/checkoutSlice'
 import type { Product } from './features/checkout/types'
-import { getAcceptanceToken, tokenizeCard } from './lib/gatewayClient'
+import { tokenizeCard } from './lib/gatewayClient'
 
 jest.mock('./lib/gatewayClient')
 
 const mockedTokenizeCard = tokenizeCard as jest.Mock
-const mockedGetAcceptanceToken = getAcceptanceToken as jest.Mock
 
 const product: Product = {
   id: 'b3f1c2a0-uuid',
@@ -29,6 +28,13 @@ const product: Product = {
   baseFee: 5000,
   deliveryFee: 8000,
   currency: 'COP',
+}
+
+const acceptanceTokens = {
+  termsToken: 'accept_terms_123',
+  termsUrl: 'https://example.com/terms.pdf',
+  personalDataToken: 'accept_personal_123',
+  personalDataUrl: 'https://example.com/personal-data.pdf',
 }
 
 const approvedTransaction = {
@@ -74,6 +80,9 @@ describe('App', () => {
       if (url.includes('/transactions/')) {
         return jsonResponse(approvedTransaction)
       }
+      if (url.includes('/payment/acceptance-tokens')) {
+        return jsonResponse(acceptanceTokens)
+      }
       return jsonResponse(product)
     })
   })
@@ -107,7 +116,6 @@ describe('App', () => {
       brand: 'VISA',
       last4: '1111',
     })
-    mockedGetAcceptanceToken.mockResolvedValue('accept_123')
     const store = configureStore({
       reducer: { checkout: checkoutReducer, [api.reducerPath]: api.reducer },
       middleware: (getDefaultMiddleware) =>
@@ -131,6 +139,12 @@ describe('App', () => {
     await user.type(screen.getByLabelText('Phone'), '+573001234567')
     await user.type(screen.getByLabelText('Address'), 'Calle 123 #45-67')
     await user.type(screen.getByLabelText('City'), 'Bogotá')
+    await user.click(
+      await screen.findByRole('checkbox', { name: /terms and conditions/ }),
+    )
+    await user.click(
+      screen.getByRole('checkbox', { name: /handling of my personal data/ }),
+    )
     await user.click(screen.getByRole('button', { name: 'Continue' }))
 
     // Screen 3 renders with the summary's own "Pay" button — proof the

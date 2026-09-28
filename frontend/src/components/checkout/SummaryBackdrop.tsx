@@ -81,6 +81,7 @@ export function SummaryBackdrop({ paymentSecrets }: SummaryBackdropProps) {
         quantity,
         cardToken: paymentSecrets.cardToken,
         paymentAcceptanceToken: paymentSecrets.paymentAcceptanceToken,
+        personalDataAuthToken: paymentSecrets.personalDataAuthToken,
         customer: safeCustomer,
         delivery: safeDelivery,
       }).unwrap()

@@ -1,5 +1,6 @@
 import { HttpStatus } from '@nestjs/common';
 import {
+  GatewayError,
   InvalidTransition,
   OutOfStock,
   ProductNotFound,
@@ -56,5 +57,13 @@ describe('toHttpException', () => {
     const body = exception.getResponse() as { errorCode: string; message: string };
     expect(body.errorCode).toBe('INTERNAL_ERROR');
     expect(body.message).not.toContain('connection string');
+  });
+
+  it('maps GatewayError to a 502, without leaking the internal reason', () => {
+    const exception = toHttpException(new GatewayError('connect ECONNREFUSED 10.0.0.1'));
+    expect(exception.getStatus()).toBe(HttpStatus.BAD_GATEWAY);
+    const body = exception.getResponse() as { errorCode: string; message: string };
+    expect(body.errorCode).toBe('GATEWAY_ERROR');
+    expect(body.message).not.toContain('10.0.0.1');
   });
 });

@@ -8,8 +8,16 @@ export interface CreateTransactionRequest {
   quantity: number
   cardToken: string
   paymentAcceptanceToken: string
+  personalDataAuthToken: string
   customer: CustomerDraft
   delivery: DeliveryDraft
+}
+
+export interface AcceptanceTokens {
+  termsToken: string
+  termsUrl: string
+  personalDataToken: string
+  personalDataUrl: string
 }
 
 export interface TransactionAmount {
@@ -70,6 +78,12 @@ export const api = createApi({
     getCurrentProduct: builder.query<Product, void>({
       query: () => 'products/current',
     }),
+    // Proxied through our backend, not called directly from the browser like
+    // gatewayClient.ts's tokenizeCard — the gateway's merchant-info endpoint
+    // has no CORS support for cross-origin (browser) requests.
+    getAcceptanceTokens: builder.query<AcceptanceTokens, void>({
+      query: () => 'payment/acceptance-tokens',
+    }),
     createTransaction: builder.mutation<
       TransactionResult,
       CreateTransactionRequest
@@ -87,6 +101,7 @@ export const api = createApi({
 
 export const {
   useGetCurrentProductQuery,
+  useGetAcceptanceTokensQuery,
   useCreateTransactionMutation,
   useGetTransactionQuery,
 } = api

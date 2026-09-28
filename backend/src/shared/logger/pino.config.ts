@@ -11,6 +11,7 @@ import type { Params } from 'nestjs-pino';
 export const REDACT_PATHS = [
   'cmd.cardToken',
   'cmd.paymentAcceptanceToken',
+  'cmd.personalDataAuthToken',
   'cmd.customer.email',
   'cmd.customer.phone',
   'cmd.delivery.address',

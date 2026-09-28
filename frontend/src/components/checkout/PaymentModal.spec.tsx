@@ -2,14 +2,24 @@ import { configureStore } from '@reduxjs/toolkit'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Provider } from 'react-redux'
+import { useGetAcceptanceTokensQuery } from '../../features/checkout/api'
 import checkoutReducer from '../../features/checkout/checkoutSlice'
-import { getAcceptanceToken, tokenizeCard } from '../../lib/gatewayClient'
+import { tokenizeCard } from '../../lib/gatewayClient'
 import { PaymentModal, type PaymentSecrets } from './PaymentModal'
 
 jest.mock('../../lib/gatewayClient')
+jest.mock('../../features/checkout/api')
 
 const mockedTokenizeCard = tokenizeCard as jest.Mock
-const mockedGetAcceptanceToken = getAcceptanceToken as jest.Mock
+const mockedUseGetAcceptanceTokensQuery =
+  useGetAcceptanceTokensQuery as jest.Mock
+
+const acceptanceTokens = {
+  termsToken: 'accept_terms_123',
+  termsUrl: 'https://example.com/terms.pdf',
+  personalDataToken: 'accept_personal_123',
+  personalDataUrl: 'https://example.com/personal-data.pdf',
+}
 
 const validCard = {
   number: '4111 1111 1111 1111',
@@ -63,9 +73,24 @@ async function fillForm(
   }
 }
 
+async function acceptAllConsent(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(
+    screen.getByRole('checkbox', { name: /terms and conditions/ }),
+  )
+  await user.click(
+    screen.getByRole('checkbox', { name: /handling of my personal data/ }),
+  )
+}
+
 describe('PaymentModal', () => {
   beforeEach(() => {
     jest.clearAllMocks()
+    mockedUseGetAcceptanceTokensQuery.mockReturnValue({
+      data: acceptanceTokens,
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    })
   })
 
   it('is not dismissible — the checkout flow is strictly forward-only', async () => {
@@ -87,18 +112,77 @@ describe('PaymentModal', () => {
     expect(screen.getByText('VISA')).toBeInTheDocument()
   })
 
-  it('tokenizes the card, fetches the acceptance token, and advances to step 3 on a valid submit', async () => {
+  it('disables Continue until both consent checkboxes are checked', async () => {
+    const user = userEvent.setup()
+    renderModal()
+    await fillForm(user)
+
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeDisabled()
+
+    await user.click(
+      screen.getByRole('checkbox', { name: /terms and conditions/ }),
+    )
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeDisabled()
+
+    await user.click(
+      screen.getByRole('checkbox', { name: /handling of my personal data/ }),
+    )
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeEnabled()
+  })
+
+  it('links each checkbox to its own contract permalink', () => {
+    renderModal()
+
+    expect(
+      screen.getByRole('link', { name: 'terms and conditions' }),
+    ).toHaveAttribute('href', acceptanceTokens.termsUrl)
+    expect(
+      screen.getByRole('link', { name: 'handling of my personal data' }),
+    ).toHaveAttribute('href', acceptanceTokens.personalDataUrl)
+  })
+
+  it('disables Continue and shows a loading state while the consent tokens are being fetched', () => {
+    mockedUseGetAcceptanceTokensQuery.mockReturnValue({
+      data: undefined,
+      isLoading: true,
+      isError: false,
+      refetch: jest.fn(),
+    })
+    renderModal()
+
+    expect(screen.getByText('Loading terms...')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeDisabled()
+  })
+
+  it('shows a retry option and keeps Continue disabled when the consent tokens fail to load', async () => {
+    const user = userEvent.setup()
+    const refetch = jest.fn()
+    mockedUseGetAcceptanceTokensQuery.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      refetch,
+    })
+    renderModal()
+
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeDisabled()
+    await user.click(screen.getByRole('button', { name: 'Try again' }))
+
+    expect(refetch).toHaveBeenCalled()
+  })
+
+  it('tokenizes the card and advances to step 3 on a valid submit', async () => {
     const user = userEvent.setup()
     mockedTokenizeCard.mockResolvedValue({
       cardToken: 'tok_test_1',
       brand: 'VISA',
       last4: '1111',
     })
-    mockedGetAcceptanceToken.mockResolvedValue('accept_123')
     const onSubmitted = jest.fn()
     const store = renderModal(onSubmitted)
 
     await fillForm(user)
+    await acceptAllConsent(user)
     await user.click(screen.getByRole('button', { name: 'Continue' }))
 
     expect(await screen.findByText('Continue')).toBeEnabled()
@@ -106,7 +190,8 @@ describe('PaymentModal', () => {
       cardToken: 'tok_test_1',
       cardBrand: 'VISA',
       cardLast4: '1111',
-      paymentAcceptanceToken: 'accept_123',
+      paymentAcceptanceToken: 'accept_terms_123',
+      personalDataAuthToken: 'accept_personal_123',
     })
     expect(mockedTokenizeCard).toHaveBeenCalledWith({
       number: '4111111111111111',
@@ -127,11 +212,11 @@ describe('PaymentModal', () => {
   it('shows a generic error and does not advance when the gateway call fails', async () => {
     const user = userEvent.setup()
     mockedTokenizeCard.mockRejectedValue(new Error('network down'))
-    mockedGetAcceptanceToken.mockResolvedValue('accept_123')
     const onSubmitted = jest.fn()
     const store = renderModal(onSubmitted)
 
     await fillForm(user)
+    await acceptAllConsent(user)
     await user.click(screen.getByRole('button', { name: 'Continue' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
@@ -160,6 +245,7 @@ describe('PaymentModal', () => {
       renderModal(onSubmitted)
 
       await fillForm(user, { [field]: value })
+      await acceptAllConsent(user)
       await user.click(screen.getByRole('button', { name: 'Continue' }))
 
       expect(await screen.findByText(expectedMessage)).toBeInTheDocument()
