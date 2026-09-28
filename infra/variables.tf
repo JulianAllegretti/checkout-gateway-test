@@ -20,3 +20,15 @@ variable "environment" {
   type        = string
   default     = "production"
 }
+
+variable "instance_type" {
+  description = "EC2 instance type for the backend host."
+  type        = string
+  default     = "t3.micro"
+}
+
+variable "backend_port" {
+  description = "Port the backend container listens on (see backend/.env.example's PORT) — also what CloudFront's custom origin (task 5) targets."
+  type        = number
+  default     = 3000
+}
