@@ -15,3 +15,8 @@ output "backend_ecr_repository_url" {
   description = "ECR repository URL the backend.yml CI workflow (task 8) pushes to."
   value       = aws_ecr_repository.backend.repository_url
 }
+
+output "frontend_bucket_name" {
+  description = "S3 bucket the frontend.yml CI workflow (task 8) syncs the Vite build to."
+  value       = aws_s3_bucket.frontend.id
+}
