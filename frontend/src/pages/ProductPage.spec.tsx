@@ -61,6 +61,19 @@ describe('ProductPage', () => {
     expect(store.getState().checkout.productSnapshot).toEqual(product)
   })
 
+  it('always asks for a fresh fetch, since it can be reached again after a reset', () => {
+    mockedUseGetCurrentProductQuery.mockReturnValue({
+      data: product,
+      isLoading: false,
+      isError: false,
+    })
+    renderWithStore()
+
+    expect(mockedUseGetCurrentProductQuery).toHaveBeenCalledWith(undefined, {
+      refetchOnMountOrArgChange: true,
+    })
+  })
+
   it('disables and relabels the CTA when out of stock', () => {
     mockedUseGetCurrentProductQuery.mockReturnValue({
       data: { ...product, stock: 0 },

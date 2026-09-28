@@ -31,15 +31,50 @@ const product: Product = {
   currency: 'COP',
 }
 
+const approvedTransaction = {
+  transactionId: 'tx-1',
+  reference: 'ref-1',
+  status: 'APPROVED',
+  card: { brand: 'VISA', last4: '1111' },
+  amount: {
+    unitPrice: 350000,
+    quantity: 1,
+    subtotal: 350000,
+    taxRate: 0.19,
+    taxAmount: 66500,
+    product: 416500,
+    baseFee: 5000,
+    deliveryFee: 8000,
+    total: 429500,
+    currency: 'COP',
+  },
+  createdAt: '2026-09-25T14:03:00.000Z',
+}
+
+function jsonResponse(body: unknown) {
+  return {
+    ok: true,
+    status: 200,
+    text: async () => JSON.stringify(body),
+    clone() {
+      return this
+    },
+  }
+}
+
 describe('App', () => {
   beforeEach(() => {
-    global.fetch = jest.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      text: async () => JSON.stringify(product),
-      clone() {
-        return this
-      },
+    // Routed by URL, not a single fixed body: this file boots the real `api`
+    // reducer (unlike component-level specs, which mock the RTK Query hooks
+    // directly), so more than one endpoint can be hit within a single test
+    // (e.g. screen 4 polling `GET /transactions/:id` while screen 5 is
+    // re-fetching `GET /products/current`).
+    global.fetch = jest.fn().mockImplementation(async (input: Request) => {
+      const url = typeof input === 'string' ? input : input.url
+      if (url.includes('/transactions/')) {
+        return jsonResponse(approvedTransaction)
+      }
+      return jsonResponse(product)
     })
   })
 
@@ -152,6 +187,37 @@ describe('App', () => {
     )
 
     expect(screen.getByText('Payment approved')).toBeInTheDocument()
+  })
+
+  it('resets the checkout and lands back on the product page from "Back to store"', async () => {
+    const user = userEvent.setup()
+    const store = configureStore({
+      reducer: { checkout: checkoutReducer, [api.reducerPath]: api.reducer },
+      middleware: (getDefaultMiddleware) =>
+        getDefaultMiddleware().concat(api.middleware),
+    })
+    store.dispatch(productSelected(product)) // step -> 2, snapshots the product
+    store.dispatch(
+      transactionCreated({
+        transactionId: 'tx-1',
+        reference: 'ref-1',
+        status: 'APPROVED',
+      }),
+    ) // step -> 4
+
+    render(
+      <Provider store={store}>
+        <Screens />
+      </Provider>,
+    )
+    await user.click(screen.getByRole('button', { name: 'Back to store' }))
+
+    // Screen 1 (product page) again, with the checkout state fully reset —
+    // proof "back to store" isn't just a step change but a real restart.
+    expect(await screen.findByText(product.name)).toBeInTheDocument()
+    expect(store.getState().checkout.step).toBe(1)
+    expect(store.getState().checkout.productSnapshot).toBeNull()
+    expect(store.getState().checkout.transactionId).toBeNull()
   })
 
   it('renders nothing yet for a step without a screen built', () => {
