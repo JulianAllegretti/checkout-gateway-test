@@ -1,0 +1,74 @@
+name: frontend
+
+on:
+  pull_request:
+    paths:
+      - "frontend/**"
+  push:
+    branches: [main]
+    paths:
+      - "frontend/**"
+
+defaults:
+  run:
+    working-directory: frontend
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run test:cov
+
+  deploy:
+    if: github.event_name == 'push'
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci
+
+      # Vite inlines VITE_* vars at build time — VITE_PAYMENT_API_URL is a
+      # secret only because its real value is the gateway's own domain,
+      # which must never appear in this repo (CLAUDE.md), not because the
+      # built bundle keeps it hidden (it doesn't — the browser calls it
+      # directly, see ADR 0001).
+      - name: Build
+        env:
+          VITE_PAYMENT_API_URL: ${{ secrets.VITE_PAYMENT_API_URL }}
+          VITE_PAYMENT_PUBLIC_KEY: ${{ vars.VITE_PAYMENT_PUBLIC_KEY }}
+          VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
+        run: npm run build
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Sync build to S3
+        run: aws s3 sync dist "s3://${{ vars.FRONTEND_BUCKET_NAME }}" --delete
+
+      - name: Invalidate CloudFront cache
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id "${{ vars.CLOUDFRONT_DISTRIBUTION_ID }}" \
+            --paths "/*"

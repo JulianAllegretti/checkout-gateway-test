@@ -1,0 +1,11 @@
+# Copy to terraform.tfvars (gitignored) and adjust if the defaults in
+# variables.tf don't fit. Every variable here already has a default, so this
+# file is optional — it exists to document what can be overridden.
+
+aws_region   = "us-east-1"
+project_name = "checkout"
+environment  = "production"
+
+# Real value only in your own gitignored terraform.tfvars, never here — it's
+# the payment gateway's actual domain (see CLAUDE.md).
+# payment_gateway_hostname = "api-sandbox.<the-real-gateway>.dev"

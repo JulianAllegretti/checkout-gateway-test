@@ -22,6 +22,7 @@ name in code, repo name or commits; use generic terms instead (`PaymentGateway`,
 | IaC | Terraform in `/infra` | The test explicitly lists IaC as evaluated. |
 | Observability | Sentry (front + back) + structured logs with pino and correlation ID | Grafana/OpenTelemetry left as a "if this had to scale" note. |
 | Specs | Spec-driven: general spec + per-app spec (including infra), with TDD and TASKS where relevant | PRD → ARD → TDD → Tasks → Tests → Implementation. |
+| Frontend styling | TailwindCSS (utility-first) | Fast to implement mobile-first responsive layouts, integrates natively with Vite/React with no extra runtime, and covers the rubric's CSS bonus without building a custom design system. |
 
 ## Architecture
 
@@ -31,7 +32,8 @@ User ──HTTPS──► CloudFront ──┬── /*      → S3 (React SPA)
                                              ├── Nest backend
                                              └── Postgres (internal network only)
 Frontend ──(public key)──► Gateway: card tokenization
-Backend ──(private key)──► Gateway: create transaction / check status
+Backend ──(public key)───► Gateway: fetch consent tokens (no browser CORS support)
+Backend ──(private key)──► Gateway: create transaction / poll status until resolved
 ```
 
 ### EC2
@@ -85,12 +87,29 @@ Rules to keep the option of splitting into separate repos later:
 - The frontend tokenizes the card directly with the gateway using the public key.
   The card number and CVC never reach the backend; the backend only receives the
   token.
-- The integrity signature (hash of reference + amount + currency + integrity secret)
-  is generated on the backend.
+- The habeas-data consent tokens (shown to the customer as two checkboxes before
+  charging, see PRD.md) are fetched by the backend instead, even though they only
+  need the public key like tokenization — found out empirically that the gateway's
+  merchant-info endpoint doesn't send CORS headers, so a direct browser call is
+  blocked regardless. `GET /payment/acceptance-tokens` is the backend acting as a
+  same-origin proxy for a call the frontend can't make itself, not a security
+  boundary (see specs/API-CONTRACT.md).
+- The integrity signature is generated on the backend, in the gateway adapter, right
+  before charging: `SHA256(reference + amountInCents + currency + integritySecret)`,
+  concatenated with no separator. `amountInCents` is the gateway's own convention
+  (amount × 100), independent of `Money`'s peso-integer representation.
+- Every charge is created `PENDING` on the gateway's side and never resolves
+  synchronously (confirmed against the real sandbox, contrary to the original
+  assumption here) — the backend polls the gateway's status endpoint internally
+  (10 attempts, 5s apart) before responding, rather than surfacing `PENDING` to the
+  client and relying on it to poll. See specs/API-CONTRACT.md's `POST /transactions`
+  section.
 - Redux persist only stores: checkout step, transaction ID, delivery data and
   product. Never the PAN or CVC.
-- Pino redacts token, email and address. Sentry uses `beforeSend` to filter sensitive
-  data.
+- Pino redacts token, email, phone and address. Sentry uses `beforeSend` to filter
+  the same fields. A global exception filter reports only genuinely unexpected
+  errors to Sentry — domain errors (already a well-formed HTTP response) aren't
+  bugs, so they're not reported.
 
 ## Backend: hexagonal + Railway Oriented Programming
 - Library: `neverthrow` (`Result`, `ResultAsync`, `andThen`, `match`).
@@ -105,9 +124,19 @@ Rules to keep the option of splitting into separate repos later:
   `ResultAsync.fromPromise`. Exceptions die at the boundary.
 - Distinguish a technical failure (timeout/5xx → `GatewayError` → transaction ERROR)
   from a business response (card declined → `PaymentDeclined` → transaction
-  DECLINED).
-- The controller only translates via an exhaustive `switch` to HTTP: NotFound→404,
-  OutOfStock→409, PaymentDeclined→422, GatewayError→502.
+  DECLINED) — both are caught at the `PaymentGatewayPort.charge` boundary and used
+  to resolve the transaction's `status`/`reason`.
+- `PaymentDeclined`/`GatewayError` never reach the HTTP layer as errors: once the
+  gateway call returns (success or failure), the transaction has been persisted
+  with a final status, and that's an `Ok` from the use case's point of view —
+  `POST /transactions` always responds `201`, whatever the outcome. Treating a
+  decline as an HTTP error was the original design here, but it meant the response
+  carried no `transactionId`, so a declined/failed charge couldn't be recovered via
+  `GET /transactions/:id` — found while building the frontend, fixed by making
+  `create()` return `Ok(transaction)` for every resolved outcome. The controller's
+  `switch` to HTTP only ever sees the errors that mean no transaction exists at
+  all: NotFound→404, OutOfStock→409, ValidationError→400, InvalidTransition→409,
+  RepositoryError→500.
 
 ## Transaction state machine
 ```
@@ -115,9 +144,20 @@ PENDING → APPROVED | DECLINED | VOIDED | ERROR   (immutable final states)
 ```
 - `transitionTo(next): Result<Transaction, InvalidTransition>` on the entity.
 - Enforced at the DB level: `UPDATE ... SET status = $2 WHERE id = $1 AND status =
-  'PENDING'`. If it affects 0 rows, another process already updated it → don't touch
-  the stock (avoids double-decrementing between polling and a webhook).
-- Stock is only decremented if APPROVED, via an atomic update (`WHERE stock > 0`).
+  'PENDING'`. If it affects 0 rows, another process already updated it → don't repeat
+  the stock side-effect below (avoids double-processing the same transaction between
+  polling and a webhook).
+- **Stock is reserved when the transaction is created (PENDING), not when it's
+  approved.** Two concurrent buyers on the last unit must not both reach the gateway:
+  if stock is only checked/decremented at APPROVED time, both could get charged and
+  only one gets the product.
+  - On create: atomic `UPDATE products SET stock = stock - :qty WHERE id = $1 AND
+    stock >= :qty` (`:qty` is the transaction's `quantity`, see
+    [DATA-MODEL.md](../DATA-MODEL.md)). 0 rows affected → `OutOfStock`, the
+    transaction is never created and the gateway is never called.
+  - On `APPROVED`: no further stock change, it was already decremented at creation.
+  - On `DECLINED` / `ERROR` / `VOIDED`: restore the reservation, atomic `UPDATE
+    products SET stock = stock + :qty WHERE id = $1`.
 - Payment status: polling the gateway; a webhook (with an events key and signature
   validation) as a plus.
 

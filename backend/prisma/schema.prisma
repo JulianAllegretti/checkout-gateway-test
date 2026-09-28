@@ -1,0 +1,94 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum TransactionStatus {
+  PENDING
+  APPROVED
+  DECLINED
+  ERROR
+  VOIDED
+}
+
+model Product {
+  id              String        @id @default(uuid())
+  name            String
+  description     String
+  unitPriceAmount Int           @map("unit_price_amount")
+  taxRate         Decimal       @map("tax_rate") @db.Decimal(5, 4)
+  stock           Int
+  imageUrl        String?       @map("image_url")
+  isFeatured      Boolean       @default(false) @map("is_featured")
+  currency        String        @default("COP")
+  transactions    Transaction[]
+
+  @@map("products")
+}
+
+model Customer {
+  id           String        @id @default(uuid())
+  firstName    String        @map("first_name")
+  lastName     String        @map("last_name")
+  email        String        @unique
+  phone        String
+  transactions Transaction[]
+
+  @@map("customers")
+}
+
+model Transaction {
+  id                String            @id @default(uuid())
+  reference         String            @unique
+  idempotencyKey    String            @unique @map("idempotency_key")
+  productId         String            @map("product_id")
+  product           Product           @relation(fields: [productId], references: [id])
+  customerId        String            @map("customer_id")
+  customer          Customer          @relation(fields: [customerId], references: [id])
+  status            TransactionStatus @default(PENDING)
+  quantity          Int
+  unitPriceAmount   Int               @map("unit_price_amount")
+  subtotalAmount    Int               @map("subtotal_amount")
+  taxRate           Decimal           @map("tax_rate") @db.Decimal(5, 4)
+  taxAmount         Int               @map("tax_amount")
+  productAmount     Int               @map("product_amount")
+  baseFeeAmount     Int               @map("base_fee_amount")
+  deliveryFeeAmount Int               @map("delivery_fee_amount")
+  totalAmount       Int               @map("total_amount")
+  currency          String            @default("COP")
+  delivery          Delivery?
+  payment           Payment?
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
+
+  @@map("transactions")
+}
+
+model Delivery {
+  id            String      @id @default(uuid())
+  transactionId String      @unique @map("transaction_id")
+  transaction   Transaction @relation(fields: [transactionId], references: [id])
+  address       String
+  city          String
+  region        String?
+  postalCode    String?     @map("postal_code")
+  notes         String?
+
+  @@map("deliveries")
+}
+
+model Payment {
+  id               String      @id @default(uuid())
+  transactionId    String      @unique @map("transaction_id")
+  transaction      Transaction @relation(fields: [transactionId], references: [id])
+  cardLast4        String?     @map("card_last4")
+  cardBrand        String?     @map("card_brand")
+  gatewayReference String?     @map("gateway_reference")
+  declineReason    String?     @map("decline_reason")
+  errorReason      String?     @map("error_reason")
+
+  @@map("payments")
+}
