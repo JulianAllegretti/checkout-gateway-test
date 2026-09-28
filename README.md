@@ -44,7 +44,20 @@ external payment gateway (sandbox integration). Fullstack take-home test.
    In dev, the frontend and backend run on different ports/origins, unlike
    production (same origin behind CloudFront) — `vite.config.ts` proxies `/api`
    to `http://localhost:3000` so `fetchBaseQuery`'s relative `/api/*` calls
-   still work locally without any code change.
+   still work locally without any code change:
+   ```ts
+   // frontend/vite.config.ts
+   export default defineConfig({
+     plugins: [react(), tailwindcss()],
+     server: {
+       proxy: {
+         '/api': {
+           target: 'http://localhost:3000',
+         },
+       },
+     },
+   })
+   ```
 4. **Running the backend test suite**: it needs its own database (some tests
    truncate every table between cases) — `cp backend/.env.test.example
    backend/.env.test`, then `npm run db:test:setup` (creates `checkout_test` and
