@@ -24,7 +24,7 @@ git push main (backend/**)  → build image → push ECR → SSM send-command on
                                               read SSM params → write .env →
                                               docker compose pull && up -d
 git push main (frontend/**) → vite build → s3 sync → CloudFront invalidation
-git push main (infra/**)    → terraform plan (PR) → terraform apply (main)
+infra/** changes             → terraform fmt/validate in CI; apply is manual (see below)
 ```
 
 ## CI/CD (GitHub Actions, path-filtered — ADR 0001)
@@ -33,7 +33,48 @@ git push main (infra/**)    → terraform plan (PR) → terraform apply (main)
 |---|---|---|
 | `backend.yml` | install, lint, `prisma migrate deploy` against a `postgres:16-alpine` service container, `jest --coverage` (fails if < 80%) | build+push image to ECR, deploy via SSM |
 | `frontend.yml` | install, lint, `jest --coverage` (fails if < 80%) | `vite build`, `s3 sync`, CloudFront invalidation |
-| `infra.yml` | `terraform fmt -check`, `terraform validate`, `terraform plan` (posted as a PR comment) | `terraform apply` |
+| `infra.yml` | `terraform fmt -check`, `terraform init`, `terraform validate` | *(nothing — see below)* |
+
+**`infra.yml` never runs `terraform plan` or `apply`.** This stack deliberately
+uses local state (see Non-functional below) — a CI runner has no access to
+whoever's laptop last ran `terraform apply`, so any "plan" it produced would
+diff against an empty state and show every resource as a false "to create",
+which is actively misleading rather than a useful PR preview. Running a real
+plan in CI would require either remote state (a bigger change than this
+take-home's single-contributor scope justifies) or giving CI broad read
+access across every service the stack touches; running `apply` in CI would
+require a role that can modify IAM policies, including its own trust
+policy — a privilege-escalation shape worth avoiding even at this scale (see
+task 7's deploy role, which deliberately excludes anything
+Terraform/IAM/EC2-provisioning). So `terraform apply` stays a manual,
+human-run step: `git pull`, review the diff, `terraform apply` from whoever
+holds the AWS credentials, same as every task in this file was applied while
+building this stack.
+
+### GitHub Actions repository configuration (set once, after the first `terraform apply`)
+
+Repo variables (Settings → Secrets and variables → Actions → Variables),
+each copied from `terraform output` after task 7/CloudFront/ECR/S3 exist:
+
+| Variable | From |
+|---|---|
+| `AWS_DEPLOY_ROLE_ARN` | `terraform output github_actions_deploy_role_arn` |
+| `AWS_REGION` | `var.aws_region` (`us-east-1` by default) |
+| `BACKEND_ECR_REPOSITORY_URL` | `terraform output backend_ecr_repository_url` |
+| `BACKEND_INSTANCE_ID` | `terraform output backend_instance_id` |
+| `FRONTEND_BUCKET_NAME` | `terraform output frontend_bucket_name` |
+| `CLOUDFRONT_DISTRIBUTION_ID` | `terraform output cloudfront_distribution_id` |
+| `VITE_PAYMENT_PUBLIC_KEY` | The gateway's real public key — not secret (see Secrets inventory below), kept as a var rather than a secret purely by convention |
+
+Repo secrets (same page, Secrets tab) — kept as secrets only so they never
+appear in plain text in an Actions log, even though the values end up
+public in the deployed bundle regardless (the browser calls the gateway
+directly, see ADR 0001):
+
+| Secret | Value |
+|---|---|
+| `VITE_PAYMENT_API_URL` | The gateway's real API URL — never committed (CLAUDE.md) |
+| `VITE_SENTRY_DSN` | Optional — leave unset to disable Sentry in the deployed frontend |
 
 `backend.yml`'s Postgres service is a disposable, default-credentials DB scoped to
 that CI job only — it never touches the SSM-stored production DB password, and
