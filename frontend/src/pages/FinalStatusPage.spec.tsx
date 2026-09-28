@@ -1,15 +1,33 @@
 import { configureStore } from '@reduxjs/toolkit'
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { Provider } from 'react-redux'
 import checkoutReducer, {
+  productSelected,
   transactionCreated,
 } from '../features/checkout/checkoutSlice'
 import { useGetTransactionQuery } from '../features/checkout/api'
+import type { Product } from '../features/checkout/types'
 import { FinalStatusPage } from './FinalStatusPage'
 
 jest.mock('../features/checkout/api')
 
 const mockedUseGetTransactionQuery = useGetTransactionQuery as jest.Mock
+
+const product: Product = {
+  id: 'b3f1c2a0-uuid',
+  name: 'Wireless Headphones',
+  description: 'Over-ear, active noise cancellation.',
+  unitPrice: 350000,
+  taxRate: 0.19,
+  taxAmount: 66500,
+  price: 416500,
+  stock: 12,
+  imageUrl: 'https://example.com/headphones.jpg',
+  baseFee: 5000,
+  deliveryFee: 8000,
+  currency: 'COP',
+}
 
 function renderStatus(
   initial: Parameters<typeof transactionCreated>[0],
@@ -76,6 +94,43 @@ describe('FinalStatusPage', () => {
     expect(
       screen.getByText('The gateway could not be reached'),
     ).toBeInTheDocument()
+  })
+
+  it('does not offer a way back while still confirming', () => {
+    renderStatus({
+      transactionId: 'tx-1',
+      reference: 'ref-1',
+      status: 'PENDING',
+    })
+
+    expect(
+      screen.queryByRole('button', { name: 'Back to store' }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('resets the checkout and lands back on the product page on "Back to store"', async () => {
+    const user = userEvent.setup()
+    mockedUseGetTransactionQuery.mockReturnValue({ data: undefined })
+    const store = configureStore({ reducer: { checkout: checkoutReducer } })
+    store.dispatch(productSelected(product))
+    store.dispatch(
+      transactionCreated({
+        transactionId: 'tx-1',
+        reference: 'ref-1',
+        status: 'APPROVED',
+      }),
+    )
+
+    render(
+      <Provider store={store}>
+        <FinalStatusPage />
+      </Provider>,
+    )
+    await user.click(screen.getByRole('button', { name: 'Back to store' }))
+
+    expect(store.getState().checkout).toEqual(
+      checkoutReducer(undefined, { type: '@@INIT' }),
+    )
   })
 
   it('shows a generic message when there is no transaction to show', () => {

@@ -3,7 +3,10 @@ import { useEffect } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import type { RootState } from '../app/store'
 import { useGetTransactionQuery } from '../features/checkout/api'
-import { transactionStatusUpdated } from '../features/checkout/checkoutSlice'
+import {
+  checkoutReset,
+  transactionStatusUpdated,
+} from '../features/checkout/checkoutSlice'
 
 const STATUS_COPY: Record<
   'APPROVED' | 'DECLINED' | 'ERROR',
@@ -63,6 +66,13 @@ export function FinalStatusPage() {
       <h1 className={`text-2xl font-bold ${tone}`}>{title}</h1>
       <p className="text-gray-600">Reference: {reference}</p>
       {errorReason && <p className="text-sm text-gray-500">{errorReason}</p>}
+      <button
+        type="button"
+        onClick={() => dispatch(checkoutReset())}
+        className="mt-2 rounded-lg bg-gray-900 px-4 py-3 font-medium text-white"
+      >
+        Back to store
+      </button>
     </main>
   )
 }

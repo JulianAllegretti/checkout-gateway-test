@@ -5,7 +5,14 @@ import { formatMoney } from '../lib/format'
 
 export function ProductPage() {
   const dispatch = useDispatch()
-  const { data: product, isLoading, isError } = useGetCurrentProductQuery()
+  // Reached both on first load and after a checkout resets back to it
+  // (screen 5) — always refetch so stock reflects the purchase that just
+  // happened instead of serving RTK Query's cached response.
+  const {
+    data: product,
+    isLoading,
+    isError,
+  } = useGetCurrentProductQuery(undefined, { refetchOnMountOrArgChange: true })
 
   if (isLoading) {
     return (
