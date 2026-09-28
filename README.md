@@ -54,14 +54,34 @@ external payment gateway (sandbox integration). Fullstack take-home test.
 ## Tests and coverage
 
 Each app has its own suite and an 80% coverage gate (`coverageThreshold` in its
-Jest config) — CI to enforce it on every PR is still pending, see ADR 0001.
+Jest config), enforced on every PR by `.github/workflows/backend.yml` and
+`frontend.yml` (path-filtered, see [infra/specs/SPEC.md](infra/specs/SPEC.md)).
 - `cd backend && npm run test:cov` (see step 4 above for the one-time test DB
   setup first) / `npm run test:e2e`.
 - `cd frontend && npm run test:cov`.
 
 ## Deployment
 
-_Pending — link to the app deployed on AWS._
+**Infrastructure status: built and verified, AWS deployment pending account
+activation.**
+
+All of `infra/` (Terraform: EC2, S3, CloudFront, ECR, IAM/OIDC, SSM) and the
+CI/CD pipelines (`.github/workflows/`) are implemented, reviewed and merged —
+see [infra/specs/TASKS.md](infra/specs/TASKS.md) for the 9 completed tasks.
+`terraform plan` against the real AWS account succeeds cleanly (22 resources
+to create, 0 errors), and `terraform apply` is in progress: most resources
+(S3, ECR, IAM roles, SSM parameter, security group, CloudFront's response
+headers policy and OAC) are already created. The one still pending is the EC2
+instance — AWS is running its standard new-account verification on this AWS
+account, which blocks `RunInstances` until it clears (an AWS Support case is
+open, expected resolution within ~24h of account creation). Since CloudFront
+and the Elastic IP both depend on that instance, there's no live URL to link
+yet.
+
+This section will be updated with the CloudFront URL as soon as the account
+clears and `terraform apply` finishes — no code changes are needed at that
+point, only running the already-written `infra/scripts/smoke-test.sh` against
+the resulting domain.
 
 ## API documentation
 

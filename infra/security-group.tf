@@ -4,7 +4,7 @@ resource "aws_security_group" "backend" {
   vpc_id      = data.aws_vpc.default.id
 
   ingress {
-    description     = "Backend port, from CloudFront's origin-facing ranges only"
+    description     = "Backend port, from CloudFront origin-facing ranges only"
     from_port       = var.backend_port
     to_port         = var.backend_port
     protocol        = "tcp"

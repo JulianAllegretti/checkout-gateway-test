@@ -41,11 +41,11 @@ const REQUEST_TIMEOUT_MS = 10_000;
 
 // Confirmed against the real sandbox: a freshly-created transaction is always
 // PENDING — it never resolves synchronously on the creation call itself, only
-// once its own status endpoint is polled (see docs.wompi.co's
-// "Verificar estado de la transacción"). The gateway's own recommendation is
-// a webhook (`transaction.updated`) instead of polling, but that needs a
-// publicly reachable endpoint and signature verification — out of scope here,
-// so this polls synchronously within the same request instead.
+// once its own status endpoint is polled (see the gateway's own transaction
+// status documentation). The gateway's own recommendation is a webhook
+// (`transaction.updated`) instead of polling, but that needs a publicly
+// reachable endpoint and signature verification — out of scope here, so this
+// polls synchronously within the same request instead.
 const POLL_MAX_ATTEMPTS = 10;
 const POLL_INTERVAL_MS = 5_000;
 
