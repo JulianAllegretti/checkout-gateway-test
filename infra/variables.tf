@@ -32,3 +32,9 @@ variable "backend_port" {
   type        = number
   default     = 3000
 }
+
+variable "payment_gateway_hostname" {
+  description = "The payment gateway's API hostname (no scheme/path) — the frontend tokenizes cards by calling it directly, so it's allowed in the CloudFront response headers policy's CSP connect-src (task 5). The real value must never be committed (see CLAUDE.md); override via terraform.tfvars (gitignored) or TF_VAR_payment_gateway_hostname, matching frontend/.env.example's VITE_PAYMENT_API_URL."
+  type        = string
+  default     = "api-sandbox.example-gateway.dev"
+}

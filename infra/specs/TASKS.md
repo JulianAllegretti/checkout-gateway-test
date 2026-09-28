@@ -22,7 +22,9 @@ container port/image name and the S3 bucket's expected contents.
    listed in [SPEC.md](SPEC.md)'s secrets inventory — nothing broader.
 8. **CI workflows**: `backend.yml`, `frontend.yml`, `infra.yml` per SPEC.md's table.
 9. **Smoke test**: after first apply + first deploy of each app, confirm
-   `https://<cloudfront-domain>/api/health` and `https://<cloudfront-domain>/`
-   both resolve over HTTPS with the expected headers present.
+   `https://<cloudfront-domain>/health` and `https://<cloudfront-domain>/`
+   both resolve over HTTPS with the expected headers present. (`/health` is
+   outside `/api` by design — see API-CONTRACT.md — and is routed to the
+   backend through its own CloudFront behavior, task 5.)
 10. **README**: paste the final CloudFront URL as the "deployment link" required by
     the PRD's rubric.

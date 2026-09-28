@@ -12,4 +12,21 @@ locals {
 
   backend_repo_name = "${var.project_name}-backend"
   backend_image     = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/${local.backend_repo_name}:latest"
+
+  # This is a single-page app with no client-side routing (the checkout flow
+  # is a Redux `step`, not separate URLs — see ADR 0001's Frontend section),
+  # so the CSP only needs to cover same-origin assets/API calls plus the two
+  # third parties the browser talks to directly: the gateway (tokenization)
+  # and Sentry (error reporting).
+  content_security_policy = join("; ", [
+    "default-src 'self'",
+    "script-src 'self'",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' https: data:",
+    "font-src 'self'",
+    "connect-src 'self' https://${var.payment_gateway_hostname} https://*.sentry.io",
+    "frame-ancestors 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+  ])
 }
