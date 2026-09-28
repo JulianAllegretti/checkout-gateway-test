@@ -52,5 +52,13 @@ container port/image name and the S3 bucket's expected contents.
    both resolve over HTTPS with the expected headers present. (`/health` is
    outside `/api` by design — see API-CONTRACT.md — and is routed to the
    backend through its own CloudFront behavior, task 5.)
+
+   `infra/scripts/smoke-test.sh <cloudfront-domain>` automates exactly this
+   check (status code + the 5 OWASP headers from task 5, on both paths).
+   Nothing to run it against yet at the time this script was written — no
+   `terraform apply` has happened against real AWS in this repo's history,
+   only `fmt`/`validate` (no AWS credentials were configured while building
+   tasks 1-8). Run it once both exist:
+   `./infra/scripts/smoke-test.sh "$(terraform -chdir=infra output -raw cloudfront_domain_name)"`
 10. **README**: paste the final CloudFront URL as the "deployment link" required by
     the PRD's rubric.
