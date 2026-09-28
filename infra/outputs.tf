@@ -10,3 +10,8 @@ output "backend_instance_id" {
   description = "EC2 instance id, used for SSM send-command deploys (tasks 7/8)."
   value       = aws_instance.backend.id
 }
+
+output "backend_ecr_repository_url" {
+  description = "ECR repository URL the backend.yml CI workflow (task 8) pushes to."
+  value       = aws_ecr_repository.backend.repository_url
+}
