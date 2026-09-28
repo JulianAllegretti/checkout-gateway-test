@@ -30,3 +30,8 @@ output "cloudfront_distribution_id" {
   description = "Used by the frontend.yml CI workflow (task 8) to invalidate the cache after each deploy."
   value       = aws_cloudfront_distribution.frontend.id
 }
+
+output "github_actions_deploy_role_arn" {
+  description = "Set as the AWS_DEPLOY_ROLE_ARN GitHub Actions repo variable (task 8) — backend.yml/frontend.yml assume this via aws-actions/configure-aws-credentials instead of using access keys."
+  value       = aws_iam_role.github_actions_deploy.arn
+}

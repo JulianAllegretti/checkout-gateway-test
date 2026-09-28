@@ -38,3 +38,9 @@ variable "payment_gateway_hostname" {
   type        = string
   default     = "api-sandbox.example-gateway.dev"
 }
+
+variable "github_repository" {
+  description = "\"owner/repo\" allowed to assume the GitHub Actions deploy role (task 7) via OIDC — not secret, this is a public repo, just needs to match reality."
+  type        = string
+  default     = "JulianAllegretti/checkout-gateway-test"
+}
