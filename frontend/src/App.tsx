@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/react'
 import { useState } from 'react'
 import { Provider, useSelector } from 'react-redux'
 import { PersistGate } from 'redux-persist/integration/react'
@@ -8,6 +9,7 @@ import {
   type PaymentSecrets,
 } from './components/checkout/PaymentModal'
 import { SummaryBackdrop } from './components/checkout/SummaryBackdrop'
+import { reloadPage } from './lib/reload'
 import { FinalStatusPage } from './pages/FinalStatusPage'
 import { ProductPage } from './pages/ProductPage'
 
@@ -46,11 +48,35 @@ export function Screens() {
   }
 }
 
+// Catches an unexpected render crash from any screen (a bug, not a modeled
+// error case — those are handled per-screen, see SummaryBackdrop/
+// FinalStatusPage) and reports it to Sentry instead of taking down the
+// whole page. A reload is the only safe recovery: the tree that crashed
+// might have done so mid-update, so resuming it in place isn't trustworthy.
+function ErrorFallback() {
+  return (
+    <main className="flex min-h-svh flex-col items-center justify-center gap-3 p-6 text-center">
+      <p className="text-gray-500">
+        Something went wrong. Please reload the page.
+      </p>
+      <button
+        type="button"
+        onClick={reloadPage}
+        className="rounded-lg bg-gray-900 px-4 py-3 font-medium text-white"
+      >
+        Reload
+      </button>
+    </main>
+  )
+}
+
 function App() {
   return (
     <Provider store={store}>
       <PersistGate loading={null} persistor={persistor}>
-        <Screens />
+        <Sentry.ErrorBoundary fallback={<ErrorFallback />}>
+          <Screens />
+        </Sentry.ErrorBoundary>
       </PersistGate>
     </Provider>
   )

@@ -23,6 +23,10 @@ module.exports = {
     '!src/main.tsx',
     '!src/lib/env.ts',
     '!src/lib/env.mock.ts',
+    // A one-line wrapper around window.location.reload() — jsdom's real
+    // Location object can't be stubbed (non-configurable own properties),
+    // so this file exists purely to be jest.mock()'d by its caller's tests.
+    '!src/lib/reload.ts',
     '!src/**/*.spec.{ts,tsx}',
   ],
   coverageThreshold: {
