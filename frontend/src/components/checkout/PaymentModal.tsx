@@ -94,34 +94,41 @@ export function PaymentModal({ onSubmitted }: PaymentModalProps) {
   return (
     <Dialog open onClose={() => {}} className="relative z-10">
       <DialogBackdrop className="fixed inset-0 bg-black/30" />
-      <div className="fixed inset-0 flex w-screen items-center justify-center p-4">
-        <DialogPanel className="w-full max-w-md space-y-4 rounded-lg bg-white p-6">
-          <DialogTitle className="text-lg font-semibold text-gray-900">
-            Card & delivery details
-          </DialogTitle>
-          <FormProvider {...methods}>
-            <form
-              onSubmit={handleSubmit(onSubmit)}
-              className="space-y-6"
-              noValidate
-            >
-              <CardForm />
-              <DeliveryForm />
-              {submitError && (
-                <p role="alert" className="text-sm text-red-600">
-                  {submitError}
-                </p>
-              )}
-              <button
-                type="submit"
-                disabled={formState.isSubmitting}
-                className="w-full rounded-lg bg-gray-900 px-4 py-3 font-medium text-white disabled:cursor-not-allowed disabled:bg-gray-300"
+      {/* The outer layer is the one that scrolls (min-h-full lets the inner
+          flex box grow past the viewport instead of being clipped by it) —
+          a fixed, centered flex container can't be scrolled into on a short
+          viewport, which left "Continue" unreachable on mobile once the
+          form's fields exceeded the screen height. */}
+      <div className="fixed inset-0 w-screen overflow-y-auto">
+        <div className="flex min-h-full items-center justify-center p-4">
+          <DialogPanel className="w-full max-w-md space-y-4 rounded-lg bg-white p-6">
+            <DialogTitle className="text-lg font-semibold text-gray-900">
+              Card & delivery details
+            </DialogTitle>
+            <FormProvider {...methods}>
+              <form
+                onSubmit={handleSubmit(onSubmit)}
+                className="space-y-6"
+                noValidate
               >
-                {formState.isSubmitting ? 'Validating...' : 'Continue'}
-              </button>
-            </form>
-          </FormProvider>
-        </DialogPanel>
+                <CardForm />
+                <DeliveryForm />
+                {submitError && (
+                  <p role="alert" className="text-sm text-red-600">
+                    {submitError}
+                  </p>
+                )}
+                <button
+                  type="submit"
+                  disabled={formState.isSubmitting}
+                  className="w-full rounded-lg bg-gray-900 px-4 py-3 font-medium text-white disabled:cursor-not-allowed disabled:bg-gray-300"
+                >
+                  {formState.isSubmitting ? 'Validating...' : 'Continue'}
+                </button>
+              </form>
+            </FormProvider>
+          </DialogPanel>
+        </div>
       </div>
     </Dialog>
   )

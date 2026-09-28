@@ -1,9 +1,9 @@
 import { combineReducers, configureStore } from '@reduxjs/toolkit'
 import { setupListeners } from '@reduxjs/toolkit/query'
 import { persistReducer, persistStore } from 'redux-persist'
-import storage from 'redux-persist/lib/storage'
 import { api } from '../features/checkout/api'
 import checkoutReducer from '../features/checkout/checkoutSlice'
+import storage from './storage'
 
 const rootReducer = combineReducers({
   checkout: checkoutReducer,
