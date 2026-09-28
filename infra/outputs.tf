@@ -20,3 +20,13 @@ output "frontend_bucket_name" {
   description = "S3 bucket the frontend.yml CI workflow (task 8) syncs the Vite build to."
   value       = aws_s3_bucket.frontend.id
 }
+
+output "cloudfront_domain_name" {
+  description = "Public HTTPS entry point for both apps — becomes the README's deployment link (task 10) and what task 9's smoke test checks."
+  value       = aws_cloudfront_distribution.frontend.domain_name
+}
+
+output "cloudfront_distribution_id" {
+  description = "Used by the frontend.yml CI workflow (task 8) to invalidate the cache after each deploy."
+  value       = aws_cloudfront_distribution.frontend.id
+}

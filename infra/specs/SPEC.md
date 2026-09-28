@@ -71,6 +71,13 @@ repo's git history) doesn't change what infra triggers on, only when merges happ
   every later SSM Run Command deploy (task 8) invoke — it's idempotent
   (install docker if missing, refresh `.env` from SSM, `docker compose pull
   && up -d`), so there's no separate "install" vs. "update" script.
+- The gateway's own API hostname (`var.payment_gateway_hostname`, task 5) is
+  the one exception to "never in a .tf file" above — it isn't secret, only
+  forbidden from this public repo (CLAUDE.md), so it's a plain Terraform
+  variable defaulted to the same placeholder as `frontend/.env.example`'s
+  `VITE_PAYMENT_API_URL`, overridden locally via a gitignored
+  `terraform.tfvars`. It's needed at apply time to allow it in the CSP's
+  `connect-src` (the frontend tokenizes cards by calling it directly).
 
 ## Non-functional
 
