@@ -24,6 +24,8 @@ frontend/
   src/
     app/
       store.ts              # Redux store + persist config
+      storage.ts            # redux-persist's localStorage engine, reimplemented
+                             # in-house — see its own comment for why
     features/
       checkout/
         checkoutSlice.ts      # step, productSnapshot, transactionId, reference,

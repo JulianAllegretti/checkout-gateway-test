@@ -101,60 +101,65 @@ export function SummaryBackdrop({ paymentSecrets }: SummaryBackdropProps) {
   return (
     <Dialog open onClose={() => {}} className="relative z-10">
       <DialogBackdrop className="fixed inset-0 bg-black/30" />
-      <div className="fixed inset-0 flex w-screen items-end justify-center sm:items-center sm:p-4">
-        <DialogPanel className="w-full max-w-md space-y-4 rounded-t-xl bg-white p-6 sm:rounded-xl">
-          <DialogTitle className="text-lg font-semibold text-gray-900">
-            Order summary
-          </DialogTitle>
+      {/* The outer layer scrolls (see PaymentModal's identical fix) — this
+          panel is usually short enough to fit, but a long product name or
+          error message shouldn't be able to trap content off-screen. */}
+      <div className="fixed inset-0 w-screen overflow-y-auto">
+        <div className="flex min-h-full items-end justify-center sm:items-center sm:p-4">
+          <DialogPanel className="w-full max-w-md space-y-4 rounded-t-xl bg-white p-6 sm:rounded-xl">
+            <DialogTitle className="text-lg font-semibold text-gray-900">
+              Order summary
+            </DialogTitle>
 
-          <dl className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <dt className="text-gray-600">Unit price × {quantity}</dt>
-              <dd className="text-gray-900">
-                {formatMoney(subtotal, product.currency)}
-              </dd>
-            </div>
-            <div className="flex justify-between">
-              <dt className="text-gray-600">IVA</dt>
-              <dd className="text-gray-900">
-                {formatMoney(taxAmount, product.currency)}
-              </dd>
-            </div>
-            <div className="flex justify-between">
-              <dt className="text-gray-600">Base fee</dt>
-              <dd className="text-gray-900">
-                {formatMoney(product.baseFee, product.currency)}
-              </dd>
-            </div>
-            <div className="flex justify-between">
-              <dt className="text-gray-600">Delivery fee</dt>
-              <dd className="text-gray-900">
-                {formatMoney(product.deliveryFee, product.currency)}
-              </dd>
-            </div>
-            <div className="flex justify-between border-t border-gray-200 pt-2 font-semibold">
-              <dt className="text-gray-900">Total</dt>
-              <dd className="text-gray-900">
-                {formatMoney(total, product.currency)}
-              </dd>
-            </div>
-          </dl>
+            <dl className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <dt className="text-gray-600">Unit price × {quantity}</dt>
+                <dd className="text-gray-900">
+                  {formatMoney(subtotal, product.currency)}
+                </dd>
+              </div>
+              <div className="flex justify-between">
+                <dt className="text-gray-600">IVA</dt>
+                <dd className="text-gray-900">
+                  {formatMoney(taxAmount, product.currency)}
+                </dd>
+              </div>
+              <div className="flex justify-between">
+                <dt className="text-gray-600">Base fee</dt>
+                <dd className="text-gray-900">
+                  {formatMoney(product.baseFee, product.currency)}
+                </dd>
+              </div>
+              <div className="flex justify-between">
+                <dt className="text-gray-600">Delivery fee</dt>
+                <dd className="text-gray-900">
+                  {formatMoney(product.deliveryFee, product.currency)}
+                </dd>
+              </div>
+              <div className="flex justify-between border-t border-gray-200 pt-2 font-semibold">
+                <dt className="text-gray-900">Total</dt>
+                <dd className="text-gray-900">
+                  {formatMoney(total, product.currency)}
+                </dd>
+              </div>
+            </dl>
 
-          {submitError && (
-            <p role="alert" className="text-sm text-red-600">
-              {submitError}
-            </p>
-          )}
+            {submitError && (
+              <p role="alert" className="text-sm text-red-600">
+                {submitError}
+              </p>
+            )}
 
-          <button
-            type="button"
-            onClick={handlePay}
-            disabled={isLoading}
-            className="w-full rounded-lg bg-gray-900 px-4 py-3 font-medium text-white disabled:cursor-not-allowed disabled:bg-gray-300"
-          >
-            {isLoading ? 'Processing...' : 'Pay'}
-          </button>
-        </DialogPanel>
+            <button
+              type="button"
+              onClick={handlePay}
+              disabled={isLoading}
+              className="w-full rounded-lg bg-gray-900 px-4 py-3 font-medium text-white disabled:cursor-not-allowed disabled:bg-gray-300"
+            >
+              {isLoading ? 'Processing...' : 'Pay'}
+            </button>
+          </DialogPanel>
+        </div>
       </div>
     </Dialog>
   )
