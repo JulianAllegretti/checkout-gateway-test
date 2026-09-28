@@ -1,0 +1,28 @@
+name: infra
+
+on:
+  pull_request:
+    paths:
+      - "infra/**"
+
+# No plan/apply job: this stack uses local state (see infra/specs/SPEC.md's
+# Non-functional section), so a CI runner never has the real current state to
+# diff against — a "plan" here would just show every resource as a false
+# "to create". `terraform apply` stays a manual, human-run step; see
+# infra/specs/SPEC.md's CI/CD section for the full rationale.
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.16.4"
+
+      - run: terraform fmt -check
+      - run: terraform init -input=false
+      - run: terraform validate
