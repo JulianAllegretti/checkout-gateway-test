@@ -75,26 +75,15 @@ Jest config), enforced on every PR by `.github/workflows/backend.yml` and
 
 ## Deployment
 
-**Infrastructure status: built and verified, AWS deployment pending account
-activation.**
+**Live**: https://d1w2antcvb50z2.cloudfront.net
 
 All of `infra/` (Terraform: EC2, S3, CloudFront, ECR, IAM/OIDC, SSM) and the
 CI/CD pipelines (`.github/workflows/`) are implemented, reviewed and merged —
 see [infra/specs/TASKS.md](infra/specs/TASKS.md) for the 9 completed tasks.
-`terraform plan` against the real AWS account succeeds cleanly (22 resources
-to create, 0 errors), and `terraform apply` is in progress: most resources
-(S3, ECR, IAM roles, SSM parameter, security group, CloudFront's response
-headers policy and OAC) are already created. The one still pending is the EC2
-instance — AWS is running its standard new-account verification on this AWS
-account, which blocks `RunInstances` until it clears (an AWS Support case is
-open, expected resolution within ~24h of account creation). Since CloudFront
-and the Elastic IP both depend on that instance, there's no live URL to link
-yet.
-
-This section will be updated with the CloudFront URL as soon as the account
-clears and `terraform apply` finishes — no code changes are needed at that
-point, only running the already-written `infra/scripts/smoke-test.sh` against
-the resulting domain.
+`terraform apply` created all 22 resources cleanly, and both `backend.yml`
+and `frontend.yml` deploy on every push to `main`. Run
+`infra/scripts/smoke-test.sh <cloudfront-domain>` to re-verify the deployment
+(HTTPS, security headers, both entry points resolving) at any time.
 
 ## API documentation
 
