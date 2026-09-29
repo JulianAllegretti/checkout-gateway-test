@@ -8,9 +8,30 @@ set -euo pipefail
 APP_DIR=/opt/checkout
 mkdir -p "$APP_DIR"
 
+# First boot only: cloud-init always keeps the raw user_data at this path, so
+# copy it to the stable location the comment above promises — subsequent
+# deploys re-run this exact file via SSM Run Command (see backend.yml)
+# without Terraform in the loop at all.
+if [ ! -f "$APP_DIR/deploy.sh" ]; then
+  cp /var/lib/cloud/instance/user-data.txt "$APP_DIR/deploy.sh"
+  chmod +x "$APP_DIR/deploy.sh"
+fi
+
 if ! command -v docker >/dev/null 2>&1; then
-  dnf install -y docker docker-compose-plugin
+  dnf install -y docker
   systemctl enable --now docker
+fi
+
+# AL2023's repos don't carry a `docker-compose-plugin` package — the
+# Compose v2 CLI plugin has to come straight from its own GitHub releases,
+# dropped where the Docker CLI looks for plugins. Checked separately from
+# the docker install above so a redeploy still installs it even though
+# docker itself is already present by then.
+if ! docker compose version >/dev/null 2>&1; then
+  mkdir -p /usr/local/lib/docker/cli-plugins
+  curl -sSL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64" \
+    -o /usr/local/lib/docker/cli-plugins/docker-compose
+  chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
 fi
 
 # PAYMENT_API_URL is fetched from SSM rather than hardcoded here because its
@@ -80,4 +101,12 @@ aws ecr get-login-password --region ${aws_region} \
 
 cd "$APP_DIR"
 docker compose pull
+
+# Applies any migration files not yet recorded in the DB's own migrations
+# table — a no-op once the schema is current, so safe to run on every
+# deploy. Uses the backend image itself (it carries the Prisma CLI +
+# schema/migrations at runtime for exactly this, see backend/Dockerfile) in
+# a throwaway container, before the long-running one starts serving traffic.
+docker compose run --rm backend npx prisma migrate deploy
+
 docker compose up -d

@@ -29,10 +29,22 @@ data "aws_iam_policy_document" "github_actions_assume_role" {
     # workflows themselves (task 8) still gate on push-to-main, this just
     # keeps the role usable while iterating on the workflow files too. A
     # single-contributor repo doesn't need it narrowed to ref:refs/heads/main.
+    #
+    # Two patterns because GitHub changed its `sub` claim format on
+    # 2026-07-15: it now embeds the numeric owner/repo IDs
+    # (repo:owner@123/repo@456:ref:...) instead of the plain owner/repo names
+    # for repos GitHub has migrated to the new scheme. Matching only the old
+    # plain-name pattern makes AssumeRoleWithWebIdentity fail with an
+    # uninformative "Not authorized" for every token GitHub issues — this
+    # covers both so it keeps working regardless of which format a given
+    # workflow run's token uses.
     condition {
       test     = "StringLike"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:${var.github_repository}:*"]
+      values = [
+        "repo:${var.github_repository}:*",
+        "repo:${split("/", var.github_repository)[0]}@*/${split("/", var.github_repository)[1]}@*:*",
+      ]
     }
   }
 }
