@@ -75,15 +75,23 @@ Jest config), enforced on every PR by `.github/workflows/backend.yml` and
 
 ## Deployment
 
-**Live**: https://d1w2antcvb50z2.cloudfront.net
+**Status**: the AWS deployment was live and has since been torn down to stop
+incurring costs, so there is no running instance to visit. The project is
+archived.
 
 All of `infra/` (Terraform: EC2, S3, CloudFront, ECR, IAM/OIDC, SSM) and the
 CI/CD pipelines (`.github/workflows/`) are implemented, reviewed and merged —
 see [infra/specs/TASKS.md](infra/specs/TASKS.md) for the 9 completed tasks.
-`terraform apply` created all 22 resources cleanly, and both `backend.yml`
-and `frontend.yml` deploy on every push to `main`. Run
-`infra/scripts/smoke-test.sh <cloudfront-domain>` to re-verify the deployment
-(HTTPS, security headers, both entry points resolving) at any time.
+`terraform apply` created all 22 resources cleanly, and the deploy jobs in
+`backend.yml` and `frontend.yml` ran on every push to `main`.
+
+To bring it back up: fill in `infra/terraform.tfvars`, run `terraform apply`,
+put the gateway credentials in SSM Parameter Store by hand, and set the
+GitHub Actions variables/secrets from `terraform output`. Then run
+`infra/scripts/smoke-test.sh <cloudfront-domain>` to verify the deployment
+(HTTPS, security headers, both entry points resolving). Until then, the
+`deploy` jobs in the workflows will fail on push to `main` since the AWS
+role they assume no longer exists.
 
 ## API documentation
 
